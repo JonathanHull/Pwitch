@@ -66,10 +66,7 @@ class Pwitch:
         self.verbose = verbose
         self.updateRate = updateRate
 
-        self.live_connection()
-
-
-    def connectIRC(self, ircRoom=self.ircRoom)
+    def connectIRC(self, ircRoom):
         """Connect to Twtich irc room using specified login."""
 
         s = socket.socket()
@@ -80,13 +77,31 @@ class Pwitch:
         if s.recv(1024).decode("utf-8") and self.verbose:
             print("Username: {}\nChannel: {}\n".format(data["nick"],
                 ircRoom.lstrip('#')))
-        return s
 
-    def live_connection(self, connection):
-        """ """
+        ## Active connection with Twitch irc sever.
 
         while True:
-            response = self.holder.recv(1024).decode("utf-8")
+            response = s.recv(1024).decode("utf-8")
+            if response == "PING :tmi.twitch.tv\r\n":
+                s.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+        
+            else:
+
+                ## If a line of chat is detected.
+
+                name = re.match(r'^:(.*)![^:]*:(.*)', response, re.M|re.I)
+                if name:
+                    if self.verbose:
+                        print("{}: {}".format(name.group(1), name.group(2)))
+
+                ## Detect !commands.
+                #if name and re.match(r'^!.*$', name.group(2), re.M|re.I):
+                #    print(name.group(2))
+        
+            sleep(self.updateRate)
+
+    def loadCommands(self):
+        pass
 
     def chat(self, message):
         "Send message to twitch irc room using specified login."""
@@ -125,23 +140,4 @@ def connectIRC(username, oauth, ircRoom, verbose):
 
 #s = connectIRC(data["nick"], data["oauth"], data["channel"], True)
 #s = connectIRC(data["nick"], data["oauth"], "#steelwlng", True)
-s = Pwitch(data["nick"], data["oauth"], data["channel"])
-
-#while True:
-#    response = s.recv(1024).decode("utf-8")
-#    if response == "PING :tmi.twitch.tv\r\n":
-#        s.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
-#
-#    else:
-#        name = re.match(r'^:(.*)![^:]*:(.*)', response, re.M|re.I)
-#        if name:
-#            #print("{}: {}".format(name.group(1), name.group(2)))
-#            print(response)
-#            s.test()
-#
-#        #if name and re.match(r'^!.*$', name.group(2), re.M|re.I):
-#        #    print(name.group(2))
-#
-#
-#
-#    sleep(0.1)
+s = Pwitch(data["nick"], data["oauth"], "#steelwlng", verbose=True)
