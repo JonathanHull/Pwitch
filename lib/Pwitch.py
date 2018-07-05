@@ -1,14 +1,24 @@
 #!/usr/bin/env python2.7
 
 import socket
+import readline
 import re
+import sys
 
+from multiprocessing import Process
 from time import sleep
 
 ## Command line argument parser.
 
-class Pwitch:
+## Create multithreading wrapper
+def threaded(func):
+    def wrapper(n):
+        t = Process(target=func, args=(n.sock,))
+        t.start()
+        return 5
+    return wrapper
 
+class Pwitch:
     def __init__(self,
                 username, 
                 oauth, 
@@ -17,7 +27,8 @@ class Pwitch:
                 verbose=False,
                 host="irc.twitch.tv",
                 port=6667,
-                logging=False
+                logging=False,
+                chatCommands=None
                 ):
 
         self.username = username
@@ -28,6 +39,8 @@ class Pwitch:
         self.host = host
         self.port = port
         self.logging = logging
+        self.chatCommands = chatCommands
+        self.connected = True
 
         self.sock = self.connectIRC()
 
@@ -38,7 +51,6 @@ class Pwitch:
         Pwitch
 
         Parameters:-
-
         :param username:   Twitch account username.
         :param oauth:      Twitch account OAuth token.
         :param ircRoom:    Twitch IRC room to connect to.
@@ -58,8 +70,12 @@ class Pwitch:
     def connectIRC(self, ircRoom=None):
         """
         connectIRC
-        
-        Connect to Twtich irc room using specified login."""
+
+        Initialise connection to twitch irc room using class login/oauth.
+
+        Prameters:-
+        :param ircRoom:    Twitch IRC room to connect to.
+        """
 
         if not ircRoom:
             ircRoom = self.ircRoom
@@ -75,21 +91,32 @@ class Pwitch:
 
         return s
 
-    def updateIRC(self, s):
+    ##@threaded
+    def updateIRC(self, sock):
+        """
+        updateIRC
+        
+        Allow connection to Twitch IRC server, and monitor for keywords (i.e.
+        banned words / Commands).
 
+        paramers:-
+        :param sock:   Socket object returned from connectIRC.
+        """
         ## Active connection with Twitch irc sever.
 
-        while True:
-            response = s.recv(1024).decode("utf-8")
+        while self.connected:
+
+            response = sock.recv(1024).decode("utf-8")
             if response == "PING :tmi.twitch.tv\r\n":
-                s.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+                sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
         
             else:
-
-                ## If a line of chat is detected.
-
                 name = re.match(r'^:(.*)![^:]*:(.*)', response, re.M|re.I)
                 if name:
+
+                    ## Stores user input to buffer; stops irc chat overwriting
+                    ## terminal input.
+                    sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
                     if self.verbose:
                         print("{}: {}".format(name.group(1), name.group(2)))
 
@@ -98,36 +125,60 @@ class Pwitch:
 
                     ## Detect !commands.
                     if name and re.match(r'^!.*$', name.group(2), re.M|re.I):
-                        print(name.group(2))
-        
+                        print("Disconnecting...")
+                        self.connected = False
+
+                    ## Restores user input from buffer.
+                    sys.stdout.write("{}: {}".format(self.username,
+                        readline.get_line_buffer()))
+                    sys.stdout.flush()
+
             sleep(self.updateRate)
 
+
+    def getAdmins(self):
+        """Get a list of admins"""
+        pass
+
     def loadCommands(self):
+        """Load chat commands."""
         pass
 
     def loadBannedWords(self):
+        """Load list of banned words for channel."""
         pass
 
     def logChat(self):
+        """Start logging chat"""
         pass
 
     def chat(self, message):
-        "Send message to twitch irc room."""
+        """Send message to twitch irc room."""
         self.sock.send("PRIVMSG {} :{}\r\n".format(self.ircRoom, message).encode("utf-8"))
+
+    def whisper(self, user, message):
+        """Send a whisper to the specified user."""
+        self.chat(".w {} {}".format(user, message).format("utf-8"))
 
     def ban(self, user):
         """Ban the specified user from the current channel."""
-        self.chat(".ban {}".format(user))
+        self.chat(".ban {}".format(user).encode("utf-8"))
 
     def unban(self, user):
-        pass
+        """Unban the specified user from the current channel."""
+        self.chat(".unban {}".format(user).encode("utf-8"))
 
     def timeout(self, user, secs=600):
         """Timeout the specified user for the given number of seconds."""
-        self.chat(".timeout {}".format(user, secs))
+        self.chat(".timeout {} {}".format(user, secs).encode("utf-8"))
 
-    def test(self, atest="words"):
-        self.chat(atest)
+    def untimeout(self, user):
+        """Remove timeout for the specified user."""
+        self.chat(".untimeout {}".format(user).encode("utf-8"))
 
-    def logging(self):
-        pass
+
+## Create multithreading wrapper
+def threaded(func):
+    def wrapper(socket):
+        Process(target=func, args=(socket,))
+    return wrapper
