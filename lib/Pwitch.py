@@ -52,6 +52,8 @@ class Pwitch:
 
         if logging:
             import datetime
+    #        if logging == True:
+    #            file_handle = open(
 
         """
         Pwitch
@@ -133,8 +135,15 @@ class Pwitch:
                 sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
 
             else:
-                name = re.search('broadcaster/(\d).*mod=(\d).*:(.*)!.*:+?(.*)',
-                        response, re.I|re.M)
+                ## name search groups: 1: mod, 2: name, 3: chat
+
+
+
+                #name = re.search('broadcaster/(\d).*mod=(\d).*:(.*)!.*:+?(.*)',
+                #        response, re.I|re.M)
+
+                name = re.search('.*mod=(\d).*:(.*)!.*:+?(.*)', response,
+                        re.I|re.M)
                 notice = re.search('NOTICE.*:+?(.*)', response, re.M|re.I)
 
                 print(response)
@@ -151,14 +160,24 @@ class Pwitch:
                         ## Need to check modlist instead
                         ## if self.ircRoom == name then B
 
-                        if int(name.group(1)) == 1:
-                            print("[B] {}: {}".format(name.group(3),
-                                name.group(4)))
-                        elif int(name.group(2)) >  1:
-                            print("[M] {}: {}".format(name.group(3),
-                                name.group(4)))
+                        if name.group(2) == self.ircRoom.lstrip('#'):
+                            print("[B] {}: {}".format(name.group(2),
+                                name.group(3)))
+
+                            #print("[B] {}: {}".format(name.group(3),
+                            #    name.group(4)))
+
+                        if int(name.group(1)) > 1:
+                            print("[M] {}: {}".format(name.group(2),
+                                name.group(3)))
+
+                        #elif int(name.group(2)) >  1:
+                        #    print("[M] {}: {}".format(name.group(3),
+                        #        name.group(4)))
+
                         elif not self.mod_only_mode:
-                            print("{}: {}".format(name.group(3), name.group(4)))
+                            #print("{}: {}".format(name.group(3), name.group(4)))
+                            print("{}: {}".format(name.group(2), name.group(3)))
 
                     if notice:
                         print(notice.group(1))
@@ -195,7 +214,7 @@ class Pwitch:
         pass
 
     def logChat(self):
-        """Start logging chat"""j
+        """Start logging chat"""
         self.log = open(self.ircRoom, 'a+')
 
     
@@ -206,7 +225,6 @@ class Pwitch:
 
         while not n:
             ready = select.select([new_socket], [], [], self.updateRate)
-
             if ready[0]:
                 response = new_socket.recv(1024).decode("utf-8")
             else:
@@ -215,16 +233,11 @@ class Pwitch:
                 sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
 
             self.chat(".mods", socket=new_socket)
+            n = re.search(r':+\s(.*)', response, re.I|re.M)
 
-            n = re.search(r':\s(.*)', response, re.I|re.M)
+        outlist = list(n.group().strip("\r: ").split(", "))
 
-            #try:
-            #    n = re.search(r':\s(.*)', response, re.I|re.M).group(1)
-            #except:
-            #    print("no")
-
-        print("Mods: {}".format(n))
-
+        return outlist
 
     def chat(self, message, socket=None):
         """Send message to twitch irc room."""
