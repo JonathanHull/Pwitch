@@ -62,7 +62,7 @@ class PwitchClient(Pwitch):
     def _writeThread(self, _monitorThread):
         """
         _writeThread
-        Monitors and adresses user input for escaped commands, and chat input.
+        Monitors/adresses user input for escaped commands, and chat input.
 
         Parameter:-
         :_monitorThread:   threading.thread object (output from
@@ -92,11 +92,16 @@ class PwitchClient(Pwitch):
                 elif command == "mv":
                     print("Moving to channel: "+
                             "{}".format(argument1))
-                    self.connected=False
-                    self._monitorThread.join()
-                    self.ircRoom = "#{}".format(argument1)
-                    self.connected=True
-                    self.sock = self.connectIRC()
+                    #self.ircRoom = "#{}".format(argument1)
+                    self.changeIRC(argument1)
+
+
+                    #self.connected=False
+                    #self._monitorThread.join()
+                    #self.ircRoom = "#{}".format(argument1)
+                    #self.connected=True
+                    #self.sock = self.connectIRC()
+                    #self._monitorMethod().start()
 
                 ## Default command
                 elif command in ["help", "h"]:
@@ -125,7 +130,6 @@ class PwitchClient(Pwitch):
                     pass
                 elif command == "stoplog":
                     pass
-
                 elif command == "chat":
                     self.chat(argument1)
 
@@ -163,13 +167,29 @@ class PwitchClient(Pwitch):
                 elif command == "unmod":
                     self.unmod(argument1.lower())
                 elif command == "mods":
-                    self.getMods()
+                    print("Mods: {}".format(", ".join(self.mod_list)))
+                    #print("Mods: {}".format(", ".join(self.getMods())))
+                    #self.getMods()
                 elif command == "onlymod":
                     self.mod_only_mode=True
                 elif command == "onlymodoff":
                     self.mod_only_mode=False
             else:
                 self.chat(say)
+
+
+    def changeIRC(self, ircRoom):
+        self.connected=False
+        self._monitorThread.join()
+        self.ircRoom = "#{}".format(ircRoom)
+        self.connected=True
+        self.sock = self.connectIRC()
+        self.mod_list = self.getMods()
+        self._monitorThread = self._monitorMethod()
+        self._monitorThread.start()
+
+#atest = PwitchClient("steelwlng", "oauth:yx77dbgaxsjhhghxe60oij7m6w1ymn",
+#        "#dolphinchemist", verbose=True)
 
 atest = PwitchClient("steelwlng", "oauth:yx77dbgaxsjhhghxe60oij7m6w1ymn",
         "#steelwlng", verbose=True)

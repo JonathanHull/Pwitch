@@ -49,6 +49,7 @@ class Pwitch:
 
         self.connected = True
         self.sock = self.connectIRC()
+        self.mod_list = self.getMods()
 
         if logging:
             import datetime
@@ -100,9 +101,9 @@ class Pwitch:
         s.send("CAP REQ :twitch.tv/commands\r\n".encode("utf-8"))
         s.send("CAP REQ :twitch.tv/tags\r\n".encode("utf-8"))
         s.send("CAP REQ :twitch.tv/membership\r\n".encode("utf-8"))
-        if s.recv(1024).decode("utf-8") and self.verbose:
-            print("Username: {}\nChannel: {}\n".format(self.username,
-                ircRoom.lstrip('#')))
+        #if s.recv(1024).decode("utf-8") and self.verbose:
+        #    print("Username: {}\nChannel: {}\n".format(self.username,
+        #        ircRoom.lstrip('#')))
 
         s.settimeout(None)
 
@@ -137,8 +138,6 @@ class Pwitch:
             else:
                 ## name search groups: 1: mod, 2: name, 3: chat
 
-
-
                 #name = re.search('broadcaster/(\d).*mod=(\d).*:(.*)!.*:+?(.*)',
                 #        response, re.I|re.M)
 
@@ -146,60 +145,43 @@ class Pwitch:
                         re.I|re.M)
                 notice = re.search('NOTICE.*:+?(.*)', response, re.M|re.I)
 
-                print(response)
+                # print(response)
 
                 if self.verbose:
+                ## Store user input into buffer; stop print from
+                ## overwriting terminal input.
+                ## Note: Careful if implement GUI.
+                    sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())
+                        +len(self.username)+2)+'\r')
+
                     if name:
-                        ## Store user input into buffer; stop print from
-                        ## overwriting terminal input.
-                        ## Note: Careful if implement GUI.
-                        sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())
-                                +len(self.username)+2)+'\r')
-
-                        ## Check whether user is a mod or the broadcaster.
-                        ## Need to check modlist instead
-                        ## if self.ircRoom == name then B
-
                         if name.group(2) == self.ircRoom.lstrip('#'):
                             print("[B] {}: {}".format(name.group(2),
                                 name.group(3)))
 
-                            #print("[B] {}: {}".format(name.group(3),
-                            #    name.group(4)))
-
-                        if int(name.group(1)) > 1:
+                        elif name.group(2) in self.mod_list:
                             print("[M] {}: {}".format(name.group(2),
                                 name.group(3)))
 
-                        #elif int(name.group(2)) >  1:
-                        #    print("[M] {}: {}".format(name.group(3),
-                        #        name.group(4)))
-
                         elif not self.mod_only_mode:
-                            #print("{}: {}".format(name.group(3), name.group(4)))
                             print("{}: {}".format(name.group(2), name.group(3)))
 
                     if notice:
                         print(notice.group(1))
 
-                    if self.logging:
-                        if self.logging == True:
-                            pass
-                        else:
-                            pass
+                    ## Restores user input from buffer.
+                    sys.stdout.write("{}: {}".format(self.username,
+                        readline.get_line_buffer()))
+                    sys.stdout.flush()
 
-
-
+                   # if self.logging:
+                   #     pass
 
                     ## Detect !commands.
                     #if name and re.match(r'^!.*$', name.group(2), re.M|re.I):
                     #    print("Disconnecting...")
                     #    self.connected = False
 
-                    ## Restores user input from buffer.
-                    sys.stdout.write("{}: {}".format(self.username,
-                        readline.get_line_buffer()))
-                    sys.stdout.flush()
 
 
     def createThread(self):
@@ -330,12 +312,6 @@ class Pwitch:
     def unmod(self, user):
         """Revoke mod status from a user."""
         self.chat(".unmod {}".format(user))
-
-    def mod_list(self):
-        self.chat(".mods")
-
-
-
 
 
 ## Create multithreading wrapper
