@@ -145,15 +145,12 @@ class Pwitch:
                         re.I|re.M)
                 notice = re.search('NOTICE.*:+?(.*)', response, re.M|re.I)
 
-                # print(response)
-
                 if self.verbose:
-                ## Store user input into buffer; stop print from
-                ## overwriting terminal input.
-                ## Note: Careful if implement GUI.
+                    ## Store user input into buffer.
+                    ## Note: Careful if implement GUI.
                     sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())
                         +len(self.username)+2)+'\r')
-
+                    
                     if name:
                         if name.group(2) == self.ircRoom.lstrip('#'):
                             print("[B] {}: {}".format(name.group(2),
@@ -166,23 +163,18 @@ class Pwitch:
                         elif not self.mod_only_mode:
                             print("{}: {}".format(name.group(2), name.group(3)))
 
-                    if notice:
-                        print(notice.group(1))
 
-                    ## Restores user input from buffer.
-                    sys.stdout.write("{}: {}".format(self.username,
+                #    ## Restores user input from buffer.
+                    sys.stdout.write("\r{}: {}".format(self.username,
                         readline.get_line_buffer()))
                     sys.stdout.flush()
-
-                   # if self.logging:
-                   #     pass
-
-                    ## Detect !commands.
-                    #if name and re.match(r'^!.*$', name.group(2), re.M|re.I):
-                    #    print("Disconnecting...")
-                    #    self.connected = False
+                    
+                    #if notice:
+                    #    print(notice.group(1))
 
 
+    def chatCommand(self):
+        pass
 
     def createThread(self):
         pass
@@ -225,7 +217,6 @@ class Pwitch:
         """Send message to twitch irc room."""
         if not socket:
             socket = self.sock
-
         socket.send("PRIVMSG {} :{}\r\n".format(self.ircRoom, message).encode("utf-8"))
 
     def whisper(self, user, message):
