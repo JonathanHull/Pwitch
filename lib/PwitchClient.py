@@ -32,7 +32,7 @@ class PwitchClient(Pwitch):
         self.verbose=True
         self._monitorThread = self._monitorMethod(self.sock)
         self._writeThread(self._monitorThread)
-
+        
         """
         PwitchClient
         Terminal based Twitch chat client.
@@ -49,7 +49,7 @@ class PwitchClient(Pwitch):
 
     def _monitorMethod(self, sock=None):
         """
-        readThread
+        _monitorMethod
         Helper method: creates thread object which reads irc socket output.
 
         Parameter:-
@@ -71,10 +71,6 @@ class PwitchClient(Pwitch):
 
         _monitorThread.start()
 
-        #if self.ircRoom.lstrip("#") == self.username:
-        #    input_string = ("[B] {}: ".format(self.username))
-
-
         while self.connected:
             say = input("{}: ".format(self.username))
             command = re.match(r"^[\\.!](\w*)\s*(\w*)\s*(\w*)", say, re.I|re.M)
@@ -92,8 +88,8 @@ class PwitchClient(Pwitch):
                 elif command == "mv":
                     print("Moving to channel: "+
                             "{}".format(argument1))
-                    #self.ircRoom = "#{}".format(argument1)
                     self.changeIRC(argument1)
+                    break
 
 
                     #self.connected=False
@@ -168,8 +164,6 @@ class PwitchClient(Pwitch):
                     self.unmod(argument1.lower())
                 elif command == "mods":
                     print("Mods: {}".format(", ".join(self.mod_list)))
-                    #print("Mods: {}".format(", ".join(self.getMods())))
-                    #self.getMods()
                 elif command == "onlymod":
                     self.mod_only_mode=True
                 elif command == "onlymodoff":
@@ -179,17 +173,15 @@ class PwitchClient(Pwitch):
 
 
     def changeIRC(self, ircRoom):
-        self.connected=False
-        self._monitorThread.join()
-        self.ircRoom = "#{}".format(ircRoom)
+        self.connected=False                    # Flag: stop updateIRC loop
+        self._monitorThread.join()              # Join threads/kill thread 
+        self.ircRoom = "#{}".format(ircRoom)    # update self.ircRoom
         self.connected=True
-        self.sock = self.connectIRC()
-        self.mod_list = self.getMods()
-        self._monitorThread = self._monitorMethod()
-        self._monitorThread.start()
-
-#atest = PwitchClient("steelwlng", "oauth:yx77dbgaxsjhhghxe60oij7m6w1ymn",
-#        "#dolphinchemist", verbose=True)
+        self.sock = self.connectIRC()           # Create new socket object
+        self.mod_list = self.getMods()          # Get mods of new channel
+        self._monitorThread = self._monitorMethod() # New input monitoring thread
+        #self._monitorThread.start()             # Start monitoring user input
+        self._writeThread(self._monitorThread)
 
 atest = PwitchClient("steelwlng", "oauth:yx77dbgaxsjhhghxe60oij7m6w1ymn",
-        "#steelwlng", verbose=True)
+        "#steelwlng")
