@@ -91,88 +91,116 @@ class PwitchClient(Pwitch):
                     self.changeIRC(argument1)
                     break
 
+                else:
+                    self.executeCommand(command, argument1, argument2)
 
-                    #self.connected=False
-                    #self._monitorThread.join()
-                    #self.ircRoom = "#{}".format(argument1)
-                    #self.connected=True
-                    #self.sock = self.connectIRC()
-                    #self._monitorMethod().start()
 
                 ## Default command
-                elif command in ["help", "h"]:
-                    ## Scary - High chance of this breaking.
+                #elif command in ["help", "h"]:
+                #    ## Scary - High chance of this breaking.
 
-                    from os import path as p
+                #    from os import path as p
 
-                    try:
-                        ## open option help text file. 
-                        d = p.join(p.dirname(p.dirname(p.abspath(__file__))),
-                            "doc", "clientHelp.txt")
-                        with open(d, "r") as options:
-                            options = options.read()
-                        x = re.search("{}[.\S\s]*?\n\n".format(argument1),
-                            options).group()
-                        print("\n"+x)
+                #    try:
+                #        ## open option help text file. 
+                #        d = p.join(p.dirname(p.dirname(p.abspath(__file__))),
+                #            "doc", "clientHelp.txt")
+                #        with open(d, "r") as options:
+                #            options = options.read()
+                #        x = re.search("{}[.\S\s]*?\n\n".format(argument1),
+                #            options).group()
+                #        print("\n"+x)
 
-                    except FileNotFoundError:
-                        print("unable to open {}".format(d))
-                    except:
-                        print("Option not found.")
+                #    except FileNotFoundError:
+                #        print("unable to open {}".format(d))
+                #    except:
+                #        print("Option not found.")
 
-                elif command in ["whisper", "w"]:
-                    self.whisper(argument1.lower(), argument2)
-                elif command == "startlog":
-                    pass
-                elif command == "stoplog":
-                    pass
-                elif command == "chat":
-                    self.chat(argument1)
-
-                ## Administrator commands.
-                ## If user banned, then unmod them?
-
-                elif command in ["ban", "rm"]:
-                    self.ban(argument1.lower())
-                elif command == "unban":
-                    self.unban(argument1.lower())
-                elif command == "timeout":
-                    self.timeout(argument1.lower(), argument2)
-                elif command == "slow":
-                    self.slow(argument1)
-                elif command == "slowoff":
-                    self.slowoff()
-                elif command == "clear":
-                    self.clear()
-                elif command == "subscribers":
-                    self.subscribers()
-                elif command == "subscribersoff":
-                    self.subscribersoff()
-                elif command == "followers":
-                    self.followerMode(argument1)
-                elif command == "followersoff":
-                    self.followerModeOff()
-                elif command == "host":
-                    self.host(argument1, argument2)
-                elif command == "unhost":
-                    self.unhost()
-                elif command == "commercial":
-                    self.commercial(argument1)
-                elif command == "mod":
-                    self.mod(argument1.lower())
-                elif command == "unmod":
-                    self.unmod(argument1.lower())
-                elif command == "mods":
-                    print("Mods: {}".format(", ".join(self.mod_list)))
-                elif command == "onlymod":
-                    self.mod_only_mode=True
-                elif command == "onlymodoff":
-                    self.mod_only_mode=False
             else:
                 self.chat(say)
 
+    def executeCommand(self, command, argument1=None, argument2=None):
+        """
+        executeCommand.
+        Executes commands passed to Pwitch Client.
+        Note: This command does not parse twitch chat for commands.
+
+        Parameters:-
+        :param command:    User command to be executed.
+        :param argument1:  First argument.
+        :param argument2:  Seconds argument.
+        """
+        try:
+            command = command.lower()
+
+            ## Non-mod commands. 
+
+            if command in ["help", "h"]:
+                pass
+            elif command in ["whisper", "w"]:
+                self.whisper(argument1.lower(), argument2)
+            elif command == "startlog":
+                ## Update.
+                pass
+            elif command == "stoplog":
+                ## Update.
+                pass
+            elif command == "chat":
+                self.chat(argument1)
+
+            ## Mod commands.
+
+            elif command in ["ban", "rm"]:
+                self.ban(argument1.lower())
+            elif command == "unban":
+                self.unban(argument1.lower())
+            elif command == "timeout":
+                self.timeout(argument1.lower(), argument2)
+            elif command == "untimeout":
+                self.untimeout(argument1.lower())
+            elif command == "slow":
+                self.slow(argument1)
+            elif command == "slowoff":
+                self.slowoff()
+            elif command == "clear":
+                self.clear()
+            elif command == "subscribers":
+                self.subscribers()
+            elif command == "subscribersoff":
+                self.subscribersoff()
+            elif command == "followers":
+                self.followerMode(argument1)
+            elif command == "followersoff":
+                self.followerModeOff()
+            elif command == "host":
+                self.host(argument1.lower(), argument2)
+            elif command == "unhost":
+                self.unhost()
+            elif command == "commercial":
+                self.commercial(argument1)
+            elif command == "mod":
+                self.mod(argument1.lower())
+            elif command == "unmod":
+                self.unmod(argument1.lower())
+            elif command == "mods":
+                print("Mods: {}".format(", ".join(self.mod_list)))
+            elif command == "onlymod":
+                self.mod_only_mode=True
+            elif command == "onlymodoff":
+                self.mod_only_mode=False
+
+        except:
+            print("Command {} not found.".format(command))
 
     def changeIRC(self, ircRoom):
+        """
+        changeIRC
+        Change ircChannel.
+
+        Parameters:-
+        :param ircRoom:    The irc room you wish to change to.
+        """
+
         self.connected=False                    # Flag: stop updateIRC loop
         self._monitorThread.join()              # Join threads/kill thread 
         self.ircRoom = "#{}".format(ircRoom)    # update self.ircRoom
@@ -180,7 +208,6 @@ class PwitchClient(Pwitch):
         self.sock = self.connectIRC()           # Create new socket object
         self.mod_list = self.getMods()          # Get mods of new channel
         self._monitorThread = self._monitorMethod() # New input monitoring thread
-        #self._monitorThread.start()             # Start monitoring user input
         self._writeThread(self._monitorThread)
 
 atest = PwitchClient("steelwlng", "oauth:yx77dbgaxsjhhghxe60oij7m6w1ymn",
