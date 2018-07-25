@@ -3,23 +3,17 @@
 import socket
 import readline
 import select
+import os
 import re
 import sys
 
 from multiprocessing import Process
+from threading import Thread
+from datetime import datetime
 from time import sleep
 
 ## incorporate loyalty points
 ## Add method to log mod command useage.
-
-
-## Create multithreading wrapper
-def threaded(func):
-    def wrapper(n):
-        t = Process(target=func, args=(n.sock,))
-        t.start()
-        return 5
-    return wrapper
 
 class Pwitch:
     def __init__(self,
@@ -43,22 +37,25 @@ class Pwitch:
         self.host = host
         self.port = port
         self.logging = logging
+        self.autolog = False
         self.chatCommands = chatCommands
-
         self.mod_only_mode = False
-
         self.connected = True
         self.sock = self.connectIRC()
         self.mod_list = self.getMods()
 
-        if logging:
-            import datetime
-    #        if logging == True:
-    #            file_handle = open(
+        ##Scaffold
+        self.logging = True
+
+        if self.logging:
+            self._createLogDirectory()
+            ## Thread terminates when not self.connected.
+            ## Note: May want to include this in the controller :. all
+            ## monitoring threads only use a single _getDate thread.
+            Thread(target=self._getDate).start()
 
         """
         Pwitch
-
         Parent Pwitch package class.
 
         Parameters:-
@@ -101,15 +98,10 @@ class Pwitch:
         s.send("CAP REQ :twitch.tv/commands\r\n".encode("utf-8"))
         s.send("CAP REQ :twitch.tv/tags\r\n".encode("utf-8"))
         s.send("CAP REQ :twitch.tv/membership\r\n".encode("utf-8"))
-        #if s.recv(1024).decode("utf-8") and self.verbose:
-        #    print("Username: {}\nChannel: {}\n".format(self.username,
-        #        ircRoom.lstrip('#')))
-
         s.settimeout(None)
 
         return s
 
-    ##@threaded
     def updateIRC(self, sock=None):
         """
         updateIRC
@@ -124,8 +116,23 @@ class Pwitch:
         if not sock:
             sock=self.sock
 
-        while self.connected:
+        if self.autolog:
+            logDir = os.path.join(os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__))))
 
+            print(logDir)
+            #os.makedirs(logDir
+
+        ## Create log dir if autologging enabled.
+#        if self.autolog:
+#            import os.path
+#            logDir = os.path.join(os.path.dirname(os.path.dirname(
+#                os.path.abspath(__file__))))
+#            os.makedirs(logDir, mode=0755, exist_ok=True)
+
+
+
+        while self.connected:
             ready = select.select([sock], [], [], self.updateRate)
 
             if ready[0]:
@@ -137,10 +144,7 @@ class Pwitch:
 
             else:
                 ## name search groups: 1: mod, 2: name, 3: chat
-
-                #name = re.search('broadcaster/(\d).*mod=(\d).*:(.*)!.*:+?(.*)',
-                #        response, re.I|re.M)
-
+                ## name searches for chat messages from users.
                 name = re.search('.*mod=(\d).*:(.*)!.*:+?(.*)', response,
                         re.I|re.M)
                 notice = re.search('NOTICE.*:+?(.*)', response, re.M|re.I)
@@ -150,7 +154,7 @@ class Pwitch:
                     ## Note: Careful if implement GUI.
                     sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())
                         +len(self.username)+2)+'\r')
-                    
+
                     if name:
                         if name.group(2) == self.ircRoom.lstrip('#'):
                             print("[B] {}: {}".format(name.group(2),
@@ -163,14 +167,74 @@ class Pwitch:
                         elif not self.mod_only_mode:
                             print("{}: {}".format(name.group(2), name.group(3)))
 
-
-                #    ## Restores user input from buffer.
+                    ## Restores user input from buffer.
                     sys.stdout.write("\r{}: {}".format(self.username,
-                        readline.get_line_buffer()))
+                        readline.get_line_buffer().lstrip(self.username)))
                     sys.stdout.flush()
+
+                if self.logging:
+                    pass
+
+        ## Close logfile.
+
+        #if self.moderating:
+        #    pass
                     
-                    #if notice:
-                    #    print(notice.group(1))
+    def _createLogDirectory(self):
+        """
+        _createLogDirectory
+        Create log directory if logging enabled.
+
+        Note: If logging is True a default logfile is created; otherwise
+        logging is used as the log directory.
+        """
+
+        home_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        if self.logging == True:
+            log_dir = os.path.join(home, logs, ircRoom.lstrip("#"))
+        else:
+            log_dir = os.path.dirname(self.logging)
+
+        if not os.path.isdir(log_dir):
+            try:
+                os.makedirs(log_dir, mode=0o755, exist_ok=True)
+            except (OSError, IOError):
+                print("Could not create log directory : {}".format(log_dir))
+
+        return log_dir
+
+    def _getDate(self):
+        """
+        _getDate
+        Helper/Thread function for _dateThread, and logging methods.
+        A recursive method which updates self.logfile to the current date, and
+        sleeps untill the next update.
+        """
+
+        while self.connected:
+            time = datetime.now()
+
+            try:
+                FH = os.path.join(self.logging, str(time.date())) # FileHandle
+                self.logFile = open(FH, "a+")
+            except (OSError, IOError):
+                ## create logging... log.
+                sys.stderr.write("Could not create log directory: {}".format(FH))
+
+            ## number of seconds remaining in day
+            secs_remaining = 86400 - ((time.hour*3600) + (time.minute*60) + 
+                    time.second)
+            sleep(secs_remaining)
+
+    def _dateThread(self):
+        """
+        _dateThread
+        Creates date monitoring thread. Inexpensive method to prefix logfiles
+        with modification dates.
+        """
+        ## Note Thread terminates when not self.connected.
+        thread = Thread(target = self._dateGet)
 
 
     def chatCommand(self):
@@ -183,33 +247,53 @@ class Pwitch:
         """Load chat commands."""
         pass
 
-    def loadBannedWords(self):
+    def loadBannedWords(self, banCfg=None):
         """Load list of banned words for channel."""
         pass
 
-    def logChat(self):
-        """Start logging chat"""
-        self.log = open(self.ircRoom, 'a+')
+
+
+
+    #def _logMethod(self, logInput, logfile=None, autolog=self.autolog):
+    #    """
+    #    _logMethod
+    #    Pwitch chat logging method.
+
+    #    Parameter:-
+    #    :param logInput:   Message to log.
+    #    :param logfile:    Previous logging file.
+    #    :param autolog:    Specify Pwitch default date/time logging is enabled
+    #                       (Bool).
+    #    """
+
+        ## if autologging Create dir named after irc room, then year, then month
+        ## Log each file as Month_day.log
+
 
     
     def getMods(self):
-        """Get a list of admins"""
-        new_socket = self.connectIRC()
+        """
+        getMods
+        Returns a list of moderators for the current channel.
+        """
+        
+        sock = self.connectIRC()
         n=None
 
         while not n:
-            ready = select.select([new_socket], [], [], self.updateRate)
+            ready = select.select([sock], [], [], self.updateRate)
             if ready[0]:
-                response = new_socket.recv(1024).decode("utf-8")
+                response = sock.recv(1024).decode("utf-8")
             else:
                 continue
             if response == "PING :tmi.twitch.tv\r\n":
                 sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
 
-            self.chat(".mods", socket=new_socket)
+            self.chat(".mods", socket=sock)
             n = re.search(r':+\s(.*)', response, re.I|re.M)
 
         outlist = list(n.group().strip("\r: ").split(", "))
+        sock.close()
 
         return outlist
 
@@ -221,23 +305,8 @@ class Pwitch:
 
     def whisper(self, user, message):
         """Send a whisper to the specified user."""
-        #self.chat(".w {} {}".format(user, message))
-
-        #self.sock.send("CAP REQ :twitch.tv/commands\r\n".encode("utf-8"))
-        #self.sock.send("PRIVMSG {} :{}\r\n".format(user,
-        #    message).encode("utf-8"))
-
-        #while True:
-
-        #    ready = select.select([self.sock], [], [], self.updateRate)
-        #    if ready[0]:
-        #        response = self.sock.recv(1024).decode("utf-8")
-        #    else:
-        #        continue
-        #    print(response)
-
-        #if ready[0]:
-        #    response = sock.recv(1024).decode("utf-8")
+        ## Needs implementing.
+        pass
 
     def ban(self, user):
         """Ban the specified user from the current channel."""
@@ -255,7 +324,7 @@ class Pwitch:
         """Remove timeout for the specified user."""
         self.chat(".untimeout {}".format(user))
 
-    def slow(self, duration):
+    def slow(self, duration=30):
         """Limit how often users may send messages, in seconds."""
         self.chat(".slow {}".format(duration))
 
@@ -303,10 +372,3 @@ class Pwitch:
     def unmod(self, user):
         """Revoke mod status from a user."""
         self.chat(".unmod {}".format(user))
-
-
-## Create multithreading wrapper
-def threaded(func):
-    def wrapper(socket):
-        Process(target=func, args=(socket,))
-    return wrapper
