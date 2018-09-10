@@ -8,6 +8,9 @@ import re
 
 from Pwitch import Pwitch
 
+## 1) Move user input line to bottom of terminal.
+## 2) Allow Ctrl-D/Ctrl-C to close program smoothly.
+
 ## Use django
 ## Collect user statistics in Pwitch
 ## - Average number of followers over time graphs etc.

@@ -7,13 +7,22 @@ import os
 import re
 import sys
 
-from multiprocessing import Process
 from threading import Thread
 from datetime import datetime
 from time import sleep
 
+## Pwitch main module.
+
 ## incorporate loyalty points
 ## Add method to log mod command useage.
+## Add game specific commands i.e. Detect game user playing, if user has
+## specified commands associated with that game.
+
+## Add way to share banned lists between rooms.
+
+## Add Mongo/SQL database usage.
+## Create database reading method.
+## Create helper method which calls above method.
 
 class Pwitch:
     def __init__(self,
@@ -47,12 +56,12 @@ class Pwitch:
         ##Scaffold
         self.logging = True
 
-        if self.logging:
-            self._createLogDirectory()
-            ## Thread terminates when not self.connected.
-            ## Note: May want to include this in the controller :. all
-            ## monitoring threads only use a single _getDate thread.
-            Thread(target=self._getDate).start()
+        #if self.logging:
+        #    self._createLogDirectory()
+        #    ## Thread terminates when not self.connected.
+        #    ## Note: May want to include this in the controller :. all
+        #    ## monitoring threads only use a single _getDate thread.
+        #    Thread(target=self._getDate).start()
 
         """
         Pwitch
@@ -147,7 +156,7 @@ class Pwitch:
                 ## name searches for chat messages from users.
                 name = re.search('.*mod=(\d).*:(.*)!.*:+?(.*)', response,
                         re.I|re.M)
-                notice = re.search('NOTICE.*:+?(.*)', response, re.M|re.I)
+                ## notice = re.search('NOTICE.*:+?(.*)', response, re.M|re.I)
 
                 if self.verbose:
                     ## Store user input into buffer.
@@ -238,9 +247,6 @@ class Pwitch:
 
 
     def chatCommand(self):
-        pass
-
-    def createThread(self):
         pass
 
     def loadCommands(self):
