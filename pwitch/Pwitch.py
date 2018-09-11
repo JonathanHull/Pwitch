@@ -7,6 +7,10 @@ import os
 import re
 import sys
 
+if __name__ == "__main__":
+    from PwitchLogging import *
+else:
+    from .PwitchLogging import *
 from threading import Thread
 from datetime import datetime
 from time import sleep
@@ -33,9 +37,9 @@ class Pwitch:
                 verbose=False,
                 host="irc.twitch.tv",
                 port=6667,
-                logging=False,
+                logging=True,
                 chatCommands=None,
-                loyaltyMode=False
+                loyaltyMode=False,
                 ):
 
         self.username = username
@@ -50,18 +54,16 @@ class Pwitch:
         self.chatCommands = chatCommands
         self.mod_only_mode = False
         self.connected = True
+
+        if self.logging:
+            db_path = parent_dir(parent_dir(__file__))+"/log/pwitch.db"
+            self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
+        else:
+            db_path = self.logging
+
         self.sock = self.connectIRC()
         self.mod_list = self.getMods()
-
-        ##Scaffold
-        self.logging = True
-
-        #if self.logging:
-        #    self._createLogDirectory()
-        #    ## Thread terminates when not self.connected.
-        #    ## Note: May want to include this in the controller :. all
-        #    ## monitoring threads only use a single _getDate thread.
-        #    Thread(target=self._getDate).start()
+        self.connectIRC()
 
         """
         Pwitch
@@ -76,7 +78,7 @@ class Pwitch:
         :param host:       The Twitch IRC sever (irc.twitch.tv).
         :param port:       Port to connect to server (6667).
         :param logging:    Toggle chat logging (Default False). Options are:
-            - True (Log to log/#IRCROOM).
+            - True (Log to log/pwitch.db).
             - FILE (log to specified file).
 
         Note: verbose/logging False by default.
@@ -85,6 +87,15 @@ class Pwitch:
         Usage: x = Pwitch("Twitch_username", "oauth_token", "#ircRoom", True|False)
                x.ban("Twitch_username")
         """
+
+    def start(self):
+        """
+        start
+
+        Helper function; starts the Pwitch bot using user defined options.
+        """
+        self.connectIRC()
+        self.updateIRC()
 
     def connectIRC(self, ircRoom=None):
         """
@@ -119,27 +130,12 @@ class Pwitch:
         banned words / Commands).
 
         paramers:-
-        :param sock:   Socket object returned from connectIRC.
+        :param sock:   Socket object returned from connectIRC (i.e. connection
+                       to twitch irc servers)
         """
 
         if not sock:
             sock=self.sock
-
-        if self.autolog:
-            logDir = os.path.join(os.path.dirname(os.path.dirname(
-                os.path.abspath(__file__))))
-
-            print(logDir)
-            #os.makedirs(logDir
-
-        ## Create log dir if autologging enabled.
-#        if self.autolog:
-#            import os.path
-#            logDir = os.path.join(os.path.dirname(os.path.dirname(
-#                os.path.abspath(__file__))))
-#            os.makedirs(logDir, mode=0755, exist_ok=True)
-
-
 
         while self.connected:
             ready = select.select([sock], [], [], self.updateRate)
@@ -181,10 +177,19 @@ class Pwitch:
                         readline.get_line_buffer().lstrip(self.username)))
                     sys.stdout.flush()
 
-                if self.logging:
-                    pass
+                if self.logging and name:
+                    ## Imporve PwitchLogging to detect database used, rewrite to
+                    ## allow to write using same syntax.
+                    dt = datetime.utcnow()
+                    date = ",".join(str(i) for i in dt.timetuple()[:3])
+                    time = ":".join(str(i) for i in dt.timetuple()[3:6])
 
-        ## Close logfile.
+                    ## Check for errors/SQL injections
+                    try:
+                        self.database.sql_insert(name.group(2), date, time,
+                                name.group(3))
+                    except:
+                        self.timeout(name.group(2))
 
         #if self.moderating:
         #    pass
@@ -378,3 +383,14 @@ class Pwitch:
     def unmod(self, user):
         """Revoke mod status from a user."""
         self.chat(".unmod {}".format(user))
+
+
+def parent_dir(path):
+    """Returns parent directory of path"""
+    return os.path.abspath(os.path.join(path, os.pardir))
+
+
+if __name__ == "__main__":
+    test_ = Pwitch("steelwlng", "oauth:yx77dbgaxsjhhghxe60oij7m6w1ymn",
+            "#steelwlng")
+    test_.start()
