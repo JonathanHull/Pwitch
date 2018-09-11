@@ -11,6 +11,10 @@ Current Support:-
     postgreSQL (planned)
 """
 
+## Count have problem with mutliple threads connected to single SQLite server
+## when making commits. Could pass the self.database.commit() call up to the
+## thread managing child threads and make commits all at once.
+
 import sqlite3
 import os.path
 
@@ -41,27 +45,28 @@ class PwitchLogging:
         """
         PwitchLogging.connect()
 
-        Connects/Creates to passed SQLite database.
+        Creates/Connects to database file.
+        Checks for existance of database table and creates if needed.
         """
-        try:
-            if not os.path.isfile(self.db_path):
-                self.database = sqlite3.connect(self.db_path)
-                self.cursor = self.database.cursor()
-                self._create_table()
 
-            else:
-                self.database = sqlite3.connect(self.logfile)
-                self.cursor = self.database.cursor()
-        except:
-            ## Insert logging event here.
-            print("Something Broke.")
+        self.database = sqlite3.connect(self.db_path)
+        self.cursor = self.database.cursor()
+
+        self.cursor.execute("""
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type='table'
+            AND name = '{}'
+            """.format(self.db_table))
+
+        if not self.cursor.fetchone()[0] == 1:
+            self._create_table()
 
     def sql_insert(self, 
             username,
             date,
             time,
-            message,
-            ):
+            message):
         """
         sql_insert
 
@@ -72,7 +77,8 @@ class PwitchLogging:
         :param date:        Date message was sent.
         :param time:        Time message was sent.
         :param message:     Chat message.
-
+        
+        Note: date/time uses UTC, adjust accordingly.
         Note: All arguments must be of type string.
         """
 
@@ -82,6 +88,32 @@ class PwitchLogging:
         self.cursor.execute(a)
         self.database.commit()
 
+        #try:
+        #    self.cursor.execute(a)
+        #    self.database.commit()
+        #except:
+        #    raise
+        #    print("Someones trying to inject...")
+
+    def sql_read(self,
+            username,
+            date=None):
+
+        """
+        sql_read
+
+        Queries sql database for messages from specific user.
+
+        Parameters:-
+        :param username:    Username to query database.
+        :param date:        Optional parameter to search within specific data.
+        :param time:        Optional paramater to search within specific time.
+
+        Usage: object.sql_read("USERNAME")
+        """
+
+        return None
+
     def _create_table(self):
         """
         _create_table
@@ -89,9 +121,15 @@ class PwitchLogging:
         Initialises database if not predefined.
         """
 
-        self.cursor.execute('''CREATE TABLE {}
-                               (username text   NOT NULL, 
-                                date DATE       NOT NULL,
-                                time TIME       NOT NULL, 
-                                message text    NOT NULL
-                                )'''.format(self.db_table))
+        self.cursor.execute("""
+           CREATE TABLE {} (
+           username text   NOT NULL, 
+           date DATE       NOT NULL,
+           time TIME       NOT NULL, 
+           message text    NOT NULL
+           )""".format(self.db_table))
+
+## Test module
+if __name__ == "__main__":
+    x = PwitchLogging("test_database.db", "cjayride")
+    x.sql_insert("Jonathan","10-10-2018","08:23:30", "Hello")
