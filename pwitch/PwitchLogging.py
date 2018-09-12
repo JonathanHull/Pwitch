@@ -82,18 +82,13 @@ class PwitchLogging:
         Note: All arguments must be of type string.
         """
 
-        a = "INSERT INTO {} VALUES ('{}','{}','{}','{}')".format(self.db_table,
-                username, date, time, message)
+        try:
+            self.cursor.execute("INSERT INTO {} VALUES (?,?,?,?)".format(
+                self.db_table), (username, date, time, message))
+            self.database.commit()
+        except:
+            print("Something Broke...")
 
-        self.cursor.execute(a)
-        self.database.commit()
-
-        #try:
-        #    self.cursor.execute(a)
-        #    self.database.commit()
-        #except:
-        #    raise
-        #    print("Someones trying to inject...")
 
     def sql_read(self,
             username,
@@ -128,8 +123,3 @@ class PwitchLogging:
            time TIME       NOT NULL, 
            message text    NOT NULL
            )""".format(self.db_table))
-
-## Test module
-if __name__ == "__main__":
-    x = PwitchLogging("test_database.db", "cjayride")
-    x.sql_insert("Jonathan","10-10-2018","08:23:30", "Hello")
