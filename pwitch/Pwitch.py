@@ -7,10 +7,14 @@ import os
 import re
 import sys
 
-if __name__ == "__main__":
-    from PwitchLogging import *
-else:
-    from .PwitchLogging import *
+from PwitchLogging import *
+
+#if __name__ == "__main__":
+#    from PwitchLogging import *
+#else:
+#    from .PwitchLogging import *
+
+from PwitchUtils import parent_dir
 from threading import Thread
 from datetime import datetime
 from time import sleep
@@ -23,10 +27,6 @@ from time import sleep
 ## specified commands associated with that game.
 
 ## Add way to share banned lists between rooms.
-
-## Add Mongo/SQL database usage.
-## Create database reading method.
-## Create helper method which calls above method.
 
 class Pwitch:
     def __init__(self,
@@ -55,15 +55,17 @@ class Pwitch:
         self.mod_only_mode = False
         self.connected = True
 
-        if self.logging:
-            db_path = parent_dir(parent_dir(__file__))+"/log/pwitch.db"
-            self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
-        else:
-            db_path = self.logging
+        #if self.logging:
+        #    db_dir = parent_dir(parent_dir(__file__))+"/log/"
+        #    if not os.path.exists(db_dir):
+        #        os.mkdir(db_path)
+        #    db_path = db_dir+"pwitch.db"
+        #    self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
+        #else:
+        #    db_path = self.logging
 
-        self.sock = self.connectIRC()
-        self.mod_list = self.getMods()
-        self.connectIRC()
+        #self.sock = self.connectIRC()
+        #self.mod_list = self.getMods()
 
         """
         Pwitch
@@ -94,7 +96,17 @@ class Pwitch:
 
         Helper function; starts the Pwitch bot using user defined options.
         """
-        self.connectIRC()
+        if self.logging:
+            db_dir = parent_dir(parent_dir(__file__))+"/log/"
+            if not os.path.exists(db_dir):
+                os.mkdir(db_path)
+            db_path = db_dir+"pwitch.db"
+            self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
+        else:
+            db_path = self.logging
+
+        self.sock = self.connectIRC()
+        self.mod_list = self.getMods()
         self.updateIRC()
 
     def connectIRC(self, ircRoom=None):
@@ -130,8 +142,8 @@ class Pwitch:
         banned words / Commands).
 
         paramers:-
-        :param sock:   Socket object returned from connectIRC (i.e. connection
-                       to twitch irc servers)
+        :param sock:       Socket object returned from connectIRC (i.e. connection
+                           to twitch irc servers)
         """
 
         if not sock:
@@ -157,8 +169,9 @@ class Pwitch:
                 if self.verbose:
                     ## Store user input into buffer.
                     ## Note: Careful if implement GUI.
-                    sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())
-                        +len(self.username)+2)+'\r')
+                    if __name__ == "PwitchClient":
+                        sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())
+                            +len(self.username)+2)+'\r')
 
                     if name:
                         if name.group(2) == self.ircRoom.lstrip('#'):
@@ -173,9 +186,10 @@ class Pwitch:
                             print("{}: {}".format(name.group(2), name.group(3)))
 
                     ## Restores user input from buffer.
-                    sys.stdout.write("\r{}: {}".format(self.username,
-                        readline.get_line_buffer().lstrip(self.username)))
-                    sys.stdout.flush()
+                    if __name__ == "PwitchClient":
+                        sys.stdout.write("\r{}: {}".format(self.username,
+                            readline.get_line_buffer().lstrip(self.username)))
+                        sys.stdout.flush()
 
                 if self.logging and name:
                     ## Imporve PwitchLogging to detect database used, rewrite to
@@ -187,9 +201,10 @@ class Pwitch:
                     ## Check for errors/SQL injections
                     try:
                         self.database.sql_insert(name.group(2), date, time,
-                                name.group(3))
+                            name.group(3))
                     except:
-                        self.timeout(name.group(2))
+                        ## Implement logging 
+                        pass
 
         #if self.moderating:
         #    pass
@@ -218,39 +233,6 @@ class Pwitch:
 
         return log_dir
 
-    def _getDate(self):
-        """
-        _getDate
-        Helper/Thread function for _dateThread, and logging methods.
-        A recursive method which updates self.logfile to the current date, and
-        sleeps untill the next update.
-        """
-
-        while self.connected:
-            time = datetime.now()
-
-            try:
-                FH = os.path.join(self.logging, str(time.date())) # FileHandle
-                self.logFile = open(FH, "a+")
-            except (OSError, IOError):
-                ## create logging... log.
-                sys.stderr.write("Could not create log directory: {}".format(FH))
-
-            ## number of seconds remaining in day
-            secs_remaining = 86400 - ((time.hour*3600) + (time.minute*60) + 
-                    time.second)
-            sleep(secs_remaining)
-
-    def _dateThread(self):
-        """
-        _dateThread
-        Creates date monitoring thread. Inexpensive method to prefix logfiles
-        with modification dates.
-        """
-        ## Note Thread terminates when not self.connected.
-        thread = Thread(target = self._dateGet)
-
-
     def chatCommand(self):
         pass
 
@@ -261,30 +243,11 @@ class Pwitch:
     def loadBannedWords(self, banCfg=None):
         """Load list of banned words for channel."""
         pass
-
-
-
-
-    #def _logMethod(self, logInput, logfile=None, autolog=self.autolog):
-    #    """
-    #    _logMethod
-    #    Pwitch chat logging method.
-
-    #    Parameter:-
-    #    :param logInput:   Message to log.
-    #    :param logfile:    Previous logging file.
-    #    :param autolog:    Specify Pwitch default date/time logging is enabled
-    #                       (Bool).
-    #    """
-
-        ## if autologging Create dir named after irc room, then year, then month
-        ## Log each file as Month_day.log
-
-
     
     def getMods(self):
         """
         getMods
+
         Returns a list of moderators for the current channel.
         """
         
@@ -309,7 +272,17 @@ class Pwitch:
         return outlist
 
     def chat(self, message, socket=None):
-        """Send message to twitch irc room."""
+        """
+        chat
+
+        Fundamental Pwitch method.
+        Sends IRC commands to Twitch.
+
+        Parameters:-
+        :param message:    Command sent to Twitch IRC servers.
+        :param socket:     Socket connection to Twitch IRC servers.
+
+        """
         if not socket:
             socket = self.sock
         socket.send("PRIVMSG {} :{}\r\n".format(self.ircRoom, message).encode("utf-8"))
@@ -383,14 +356,3 @@ class Pwitch:
     def unmod(self, user):
         """Revoke mod status from a user."""
         self.chat(".unmod {}".format(user))
-
-
-def parent_dir(path):
-    """Returns parent directory of path"""
-    return os.path.abspath(os.path.join(path, os.pardir))
-
-
-if __name__ == "__main__":
-    test_ = Pwitch("steelwlng", "oauth:yx77dbgaxsjhhghxe60oij7m6w1ymn",
-            "#steelwlng")
-    test_.start()
