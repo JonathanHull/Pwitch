@@ -6,7 +6,12 @@ import json
 import sys
 import re
 
-from Pwitch import Pwitch
+from .Pwitch import Pwitch
+
+#if __name__ == "__main__":
+#    from Pwitch import Pwitch
+#else:
+#    from .Pwitch import Pwitch
 
 ## 1) Move user input line to bottom of terminal.
 ## 2) Allow Ctrl-D/Ctrl-C to close program smoothly.
@@ -29,13 +34,6 @@ class PwitchClient(Pwitch):
     def __init__(self, *kwd, **kwdargs):
         super().__init__(*kwd, **kwdargs)
 
-        #print("Username: {}\noauth: {}\nIrcRoom: {}\n".format(self.username,
-        #    self.oauth, self.ircRoom))
-
-        self.verbose=True
-        self._monitorThread = self._monitorMethod(self.sock)
-        self._writeThread(self._monitorThread)
-        
         """
         PwitchClient
         Terminal based Twitch chat client.
@@ -49,6 +47,12 @@ class PwitchClient(Pwitch):
         :param port:       Port to connect to server (6667).
         :param logging:    Toggle chat logging (Default False).
         """
+
+        self.verbose=True
+        self._monitorThread = self._monitorMethod(self.sock)
+        self._writeThread(self._monitorThread)
+        self.connectIRC()
+        self.mod_list = self.getMods()
 
     def _monitorMethod(self, sock=None):
         """
@@ -150,6 +154,9 @@ class PwitchClient(Pwitch):
                 pass
             elif command == "chat":
                 self.chat(argument1)
+            elif command == "channel":
+                ## print current channel
+                pass
 
             ## Mod commands.
 
@@ -212,6 +219,3 @@ class PwitchClient(Pwitch):
         self.mod_list = self.getMods()          # Get mods of new channel
         self._monitorThread = self._monitorMethod() # New input monitoring thread
         self._writeThread(self._monitorThread)
-
-atest = PwitchClient("steelwlng", "oauth:yx77dbgaxsjhhghxe60oij7m6w1ymn",
-        "#steelwlng")
