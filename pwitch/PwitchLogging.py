@@ -118,8 +118,8 @@ class PwitchLogging:
 
         self.cursor.execute("""
            CREATE TABLE {} (
-           username text   NOT NULL, 
-           date DATE       NOT NULL,
-           time TIME       NOT NULL, 
-           message text    NOT NULL
+           USERNAME text   NOT NULL, 
+           DATE DATE       NOT NULL,
+           TIME TIME       NOT NULL, 
+           MESSAGE text    NOT NULL
            )""".format(self.db_table))
