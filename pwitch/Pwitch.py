@@ -7,14 +7,14 @@ import os
 import re
 import sys
 
-from PwitchLogging import *
+from .PwitchLogging import *
 
 #if __name__ == "__main__":
 #    from PwitchLogging import *
 #else:
 #    from .PwitchLogging import *
 
-from PwitchUtils import parent_dir
+from .PwitchUtils import parent_dir
 from threading import Thread
 from datetime import datetime
 from time import sleep
@@ -28,6 +28,8 @@ from time import sleep
 
 ## Add way to share banned lists between rooms.
 
+## Enable reconnection if interupted.
+
 class Pwitch:
     def __init__(self,
                 username, 
@@ -38,6 +40,7 @@ class Pwitch:
                 host="irc.twitch.tv",
                 port=6667,
                 logging=True,
+                userBuffer=False,
                 chatCommands=None,
                 loyaltyMode=False,
                 ):
@@ -51,21 +54,12 @@ class Pwitch:
         self.port = port
         self.logging = logging
         self.autolog = False
+        self.userBuffer = userBuffer
         self.chatCommands = chatCommands
         self.mod_only_mode = False
         self.connected = True
 
-        #if self.logging:
-        #    db_dir = parent_dir(parent_dir(__file__))+"/log/"
-        #    if not os.path.exists(db_dir):
-        #        os.mkdir(db_path)
-        #    db_path = db_dir+"pwitch.db"
-        #    self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
-        #else:
-        #    db_path = self.logging
-
-        #self.sock = self.connectIRC()
-        #self.mod_list = self.getMods()
+        self.sock = self.connectIRC()
 
         """
         Pwitch
@@ -105,7 +99,6 @@ class Pwitch:
         else:
             db_path = self.logging
 
-        self.sock = self.connectIRC()
         self.mod_list = self.getMods()
         self.updateIRC()
 
@@ -169,7 +162,8 @@ class Pwitch:
                 if self.verbose:
                     ## Store user input into buffer.
                     ## Note: Careful if implement GUI.
-                    if __name__ == "PwitchClient":
+
+                    if self.userBuffer:
                         sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())
                             +len(self.username)+2)+'\r')
 
@@ -186,7 +180,7 @@ class Pwitch:
                             print("{}: {}".format(name.group(2), name.group(3)))
 
                     ## Restores user input from buffer.
-                    if __name__ == "PwitchClient":
+                    if self.userBuffer:
                         sys.stdout.write("\r{}: {}".format(self.username,
                             readline.get_line_buffer().lstrip(self.username)))
                         sys.stdout.flush()
