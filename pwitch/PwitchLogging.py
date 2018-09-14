@@ -52,6 +52,8 @@ class PwitchLogging:
         self.database = sqlite3.connect(self.db_path)
         self.cursor = self.database.cursor()
 
+        ## Checks if table exists in database.
+
         self.cursor.execute("""
             SELECT COUNT(*)
             FROM sqlite_master

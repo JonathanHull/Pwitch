@@ -86,11 +86,10 @@ if __name__ == "__main__":
      channels = cfg_dir+"irc_channels.json"
 
      with open(cfg, 'r') as w:
-         bot_cfg = json.load(w)
+         cfg = json.load(w)
 
-     with open(channels, 'r') as w:
-         ircRooms = json.load(w)["channels"]
+     channel_list = cfg["channels"]
 
-     ob = PwitchServer(bot_cfg, ircRooms)
+     ob = PwitchServer(bot_cfg, channel_list)
      ob.startThreads()
 
