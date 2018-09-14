@@ -45,22 +45,6 @@ class Pwitch:
                 loyaltyMode=False,
                 ):
 
-        self.username = username
-        self.oauth = oauth
-        self.ircRoom = ircRoom
-        self.updateRate = updateRate
-        self.verbose = verbose
-        self.host = host
-        self.port = port
-        self.logging = logging
-        self.autolog = False
-        self.userBuffer = userBuffer
-        self.chatCommands = chatCommands
-        self.mod_only_mode = False
-        self.connected = True
-
-        self.sock = self.connectIRC()
-
         """
         Pwitch
         Parent Pwitch package class.
@@ -84,21 +68,31 @@ class Pwitch:
                x.ban("Twitch_username")
         """
 
+        self.username = username
+        self.oauth = oauth
+        self.ircRoom = ircRoom
+        self.updateRate = updateRate
+        self.verbose = verbose
+        self.host = host
+        self.port = port
+        self.logging = logging
+        self.autolog = False
+        self.userBuffer = userBuffer
+        self.chatCommands = chatCommands
+        self.mod_only_mode = False
+        self.connected = True
+
+        self.sock = self.connectIRC()
+
+
     def start(self):
         """
         start
 
         Helper function; starts the Pwitch bot using user defined options.
         """
-        if self.logging:
-            db_dir = parent_dir(parent_dir(__file__))+"/log/"
-            if not os.path.exists(db_dir):
-                os.mkdir(db_path)
-            db_path = db_dir+"pwitch.db"
-            self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
-        else:
-            db_path = self.logging
 
+        self._createLogDirectory()
         self.mod_list = self.getMods()
         self.updateIRC()
 
@@ -211,21 +205,15 @@ class Pwitch:
         Note: If logging is True a default logfile is created; otherwise
         logging is used as the log directory.
         """
-
-        home_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-        if self.logging == True:
-            log_dir = os.path.join(home, logs, ircRoom.lstrip("#"))
-        else:
-            log_dir = os.path.dirname(self.logging)
-
-        if not os.path.isdir(log_dir):
-            try:
-                os.makedirs(log_dir, mode=0o755, exist_ok=True)
-            except (OSError, IOError):
-                print("Could not create log directory : {}".format(log_dir))
-
-        return log_dir
+        if self.logging:
+            if self.logging != True:
+                db_path = self.logging
+            else:
+                db_dir = parent_dir(parent_dir(__file__))+"/log/"
+                if not os.path.exists(db_dir):
+                    os.mkdir(db_path)
+                db_path = db_dir+"pwitch.db"
+            self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
 
     def chatCommand(self):
         pass
@@ -244,21 +232,24 @@ class Pwitch:
 
         Returns a list of moderators for the current channel.
         """
-        
         sock = self.connectIRC()
         n=None
 
+        ## Try loops stops script from breaking if server doesn't reply
+        ## immediately
         while not n:
-            ready = select.select([sock], [], [], self.updateRate)
-            if ready[0]:
-                response = sock.recv(1024).decode("utf-8")
-            else:
-                continue
-            if response == "PING :tmi.twitch.tv\r\n":
-                sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
-
-            self.chat(".mods", socket=sock)
-            n = re.search(r':+\s(.*)', response, re.I|re.M)
+            try:
+                ready = select.select([sock], [], [], self.updateRate)
+                if ready[0]:
+                    response = sock.recv(1024).decode("utf-8")
+                else:
+                    continue
+                if response == "PING :tmi.twitch.tv\r\n":
+                    sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+                self.chat(".mods", socket=sock)
+                n = re.search(r':+\s(.*)', response, re.I|re.M)
+            except:
+                n = None
 
         outlist = list(n.group().strip("\r: ").split(", "))
         sock.close()
