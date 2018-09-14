@@ -1,0 +1,14 @@
+{
+    "host": "irc.twitch.tv",
+    "port": 6667,
+    "nick": "example",
+    "oauth": "oauth:example",
+    "channel": "#example",
+    "channels" : [
+        "#example1",
+        "#example2",
+        "#example3",
+        "#example4",
+        "#example5"
+    ]
+}
