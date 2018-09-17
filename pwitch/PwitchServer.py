@@ -15,8 +15,9 @@ from multiprocessing import Process, Queue
 class PwitchServer:
     def __init__(self,
                  cfg, 
-                 channels, 
-                 #timeout):
+                 channels,
+                 verbose = True,
+                 timeout = 10,
                  ):
         """
         PwitchServer
@@ -29,11 +30,15 @@ class PwitchServer:
         :param cfg:             cfg dictionary - Check cfg/cfg.json
         :param channels:        List of irc channels to monitor - Check
                                 cfg/irc_channels.json
-        :param timeout:         Set the 
+        :param verbose:         Enable verbose output.
+        :param timeout:         Set max hang time for threads. [Implement]
         """
 
         self.cfg = cfg
         self.channels = channels
+        self.verbose = verbose
+        self.timeout = timeout
+        self.connected = True     # watchdog thread flag
 
     def start(self):
         """
@@ -60,7 +65,7 @@ class PwitchServer:
         :param timeout:         Time for process to shutdown before termination.
         """
         ## Extensive logging required.
-        while True:
+        while self.connected:
             for process,queue,flag in self.process_dict.values():
 
             ## try to terminate if attempt to close failed.
@@ -126,7 +131,8 @@ class PwitchServer:
                                 create_process_dict.
                                 i.e. adict["ircRoom"] = [Process, Queue]
         """
-        print("[SERVER] Starting...")
+        if self.verbose:
+            print("[SERVER] Starting...")
         for i in process_dict.keys():
             process_dict[i][0].name = i
             process_dict[i][0].start()
@@ -141,6 +147,8 @@ class PwitchServer:
         """
 
         pwitch_process[1].put(False)
+        time.sleep(0.1)
+        self.connected = False
         ## Watchdog to make sure it shuts down
 
     def stop_processes(self):
@@ -154,8 +162,12 @@ class PwitchServer:
         except:
             print("Processes may not have been initalised.")
         else:
-            for i in self.adict.keys():
-                self.adict[i][0].put(False)
+            for i in self.process_dict.keys():
+                self.process_dict[i][1].put(False)
+                if self.verbose:
+                    print("[DISCONNECTED] {}".format(i))
+
+            self.connected = False
 
         ## use watchdog to see if threads close properly
         ## Join threads
