@@ -1,8 +1,8 @@
 #!/usr/bin/env python2.7
 
 import socket
-import readline
 import select
+import signal
 import os
 import re
 import sys
@@ -95,7 +95,11 @@ class Pwitch:
 
         self._createLogDirectory()
         self.mod_list = self.getMods()
-        self.updateIRC()
+
+        try:
+            self.updateIRC()
+        except KeyboardInterrupt:
+            pass
 
     def connectIRC(self, ircRoom=None):
         """
@@ -200,6 +204,8 @@ class Pwitch:
                     self.connected = self.process_queue.get_nowait()
                 except:
                     pass
+
+        print("Disconnecting")
 
         #if self.moderating:
         #    pass
