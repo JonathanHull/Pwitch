@@ -1,10 +1,12 @@
 #!/usr/bin/env python3.6
 
 import json
+import queue
+import multiprocessing as mp
 
 from time import sleep
 from .Pwitch import Pwitch
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 
 ## Enable users to check status of each thread if input is enabled
 ## i.e. Pwitch.userBuffer
@@ -13,7 +15,11 @@ from multiprocessing import Process
 ## Reconnect to disconnected channels every 60 seconds.
 
 class PwitchServer:
-    def __init__(self, cfg, channels):
+    def __init__(self,
+                 cfg, 
+                 channels, 
+                 #timeout):
+                 ):
         """
         PwitchServer
 
@@ -25,10 +31,25 @@ class PwitchServer:
         :param cfg:         cfg dictionary - Check cfg/cfg.json
         :param channels:    List of irc channels to monitor - Check
                             cfg/irc_channels.json
+        :param timeout:     Set the 
         """
 
         self.cfg = cfg
         self.channels = channels
+
+    def watchdog(self):
+        """
+        watchdog
+
+        Watches the queue object for updates, and sends a signal to it if the
+        status of the child process has changed
+        """
+        while True:
+            try:
+                msg = q.get(timeout=self.timeout)
+
+            except:
+                pass
 
     def _generateThreadDict(self):
         """
@@ -45,8 +66,15 @@ class PwitchServer:
         channels = self.channels
 
         for i in channels:
-            pwitch_object = Pwitch(username, oauth, i)
-            adict[i] = [pwitch_object, Process(target=pwitch_object.start)]
+            q = Queue()
+            #pwitch_object = Pwitch(username, oauth, i)
+            a = Pwitch(username, oauth, i, process_queue=q)
+            q.put(True)
+            adict[i] = [Process(target=a.start), q]
+            #adict[i] = [Process(target=Pwitch, args=(username, oauth, i,
+            #    child_conn)), parent_conn]
+            #adict[i] = [pwitch_object, Process(target=pwitch_object.start)]
+
 
         return adict
 
@@ -56,14 +84,13 @@ class PwitchServer:
 
         Helper function; intialises pwitch threads
         """
-        print("### Starting Pwitch Server ###")
+        print("[SERVER] Starting...")
 
         self.adict = self._generateThreadDict()
 
         for i in self.adict.keys():
-            print("### Starting : {} ###".format(i.lstrip("#")))
-            self.adict[i][1].start()
-
+            self.adict[i][0].start()
+            print("[CONNECTED] {}".format(i.lstrip("#")))
 
     def stopThreads(self):
         """
@@ -78,7 +105,10 @@ class PwitchServer:
             print("Processes have not been initalised.")
         else:
             for i in self.adict.keys():
-                self.adict[i][0].connected = False
+                self.adict[i][0].put(False)
+
+        ## use watchdog to see if threads close properly
+        ## Join threads
 
 if __name__ == "__main__":
      cfg_dir = "/home/jonathan/projects/Pwitch/cfg/"

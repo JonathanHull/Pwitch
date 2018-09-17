@@ -34,7 +34,7 @@ class Pwitch:
     def __init__(self,
                 username, 
                 oauth, 
-                ircRoom, 
+                ircRoom,
                 updateRate=(10/30),
                 verbose=False,
                 host="irc.twitch.tv",
@@ -43,6 +43,7 @@ class Pwitch:
                 userBuffer=False,
                 chatCommands=None,
                 loyaltyMode=False,
+                process_queue=None
                 ):
 
         """
@@ -80,10 +81,10 @@ class Pwitch:
         self.userBuffer = userBuffer
         self.chatCommands = chatCommands
         self.mod_only_mode = False
-        self.connected = True
-
         self.sock = self.connectIRC()
+        self.process_queue = process_queue
 
+        self.connected = True
 
     def start(self):
         """
@@ -193,6 +194,12 @@ class Pwitch:
                     except:
                         ## Implement logging 
                         pass
+
+                ## PwitchServer flag
+                try:
+                    self.connected = self.process_queue.get_nowait()
+                except:
+                    pass
 
         #if self.moderating:
         #    pass
