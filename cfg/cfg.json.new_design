@@ -1,0 +1,25 @@
+{
+    "host": "irc.twitch.tv",
+    "port": 6667,
+    "nick": "example",
+    "oauth": "oauth:example",
+    "channel": "#example",
+    "channels" : {
+        "channel1": {
+            "is_admin": "TRUE",
+            "is_logging": "TRUE",
+            "games": ["list of games here [Not Implemented"],
+            "messages": {
+                "timed": {
+                    "motd": ["This is the motd; seconds between messages ->",1800 ]   
+                }
+                "all": {
+                    "reply": "!reply - prints this message"
+                }
+                "mod": {
+                    "mod_msg": "!mod_msg; only mods can invoke"
+                }
+            }
+        }
+    }
+}
