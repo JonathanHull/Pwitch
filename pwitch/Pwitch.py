@@ -2,7 +2,7 @@
 
 import socket
 import select
-import signal
+import readline
 import os
 import re
 import sys
@@ -188,24 +188,29 @@ class Pwitch:
                     ## Imporve PwitchLogging to detect database used, rewrite to
                     ## allow to write using same syntax.
                     dt = datetime.utcnow()
-                    date = ",".join(str(i) for i in dt.timetuple()[:3])
+                    date = ",".join(str(i) for i in dt.timetuple()[:3]).replace(",","-")
                     time = ":".join(str(i) for i in dt.timetuple()[3:6])
+                    d = "M".join([date,time])
+                    self.database.log_chat(name.group(2), d, name.group(3))
+                    #d = "N".join([date,time])
 
                     ## Check for errors/SQL injections
-                    try:
-                        self.database.sql_insert(name.group(2), date, time,
-                            name.group(3))
-                    except:
-                        ## Implement logging 
-                        pass
+                    #try:
+                    #    #self.database.sql_insert(name.group(2), date, time,
+                    #    #    name.group(3))
+
+                    #    print("here")
+                    #    self.database.log_chat(name.group(2), d, name.group(3))
+                    #except:
+                    #    ## Implement logging 
+                    #    print("Unable to log...")
+                    #    pass
 
                 ## PwitchServer flag
                 try:
                     self.connected = self.process_queue.get_nowait()
                 except:
                     pass
-
-        print("Disconnecting")
 
         #if self.moderating:
         #    pass
@@ -226,7 +231,8 @@ class Pwitch:
                 if not os.path.exists(db_dir):
                     os.mkdir(db_path)
                 db_path = db_dir+"pwitch.db"
-            self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
+            #self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
+            self.database = PwitchChannelStats(db_path, self.ircRoom.lstrip('#'))
 
     def chatCommand(self):
         pass
