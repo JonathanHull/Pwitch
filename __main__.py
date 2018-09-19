@@ -1,4 +1,7 @@
+    #!/usr/bin/env python3
+
 import argparse
+import signal
 import json
 import sys
 import os
@@ -34,13 +37,23 @@ def main():
 
     if args.service == "server":
         irc_channels = cfg["channels"]
+        global PwitchMaster
         PwitchMaster = PwitchServer(cfg, irc_channels)
-        PwitchMaster.startThreads()
+        PwitchMaster.start()
+        print("Press Ctrl+C to exit")
 
     elif args.service == "client":
         os.environ['chatBuffer'] = "yes"
         x = PwitchClient(cfg["nick"], cfg["oauth"], cfg["channel"],
             userBuffer=True)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+
+def signal_handler(sig, frame):
+    print("\n[SERVER] Disconnecting")
+    PwitchMaster.stop_processes()
+    #sys.exit(0)
 
 if __name__ == "__main__":
     cfg_dir = os.path.dirname(os.path.abspath(__file__))+"/cfg/"

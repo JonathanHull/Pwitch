@@ -1,14 +1,15 @@
 {
     "host": "irc.twitch.tv",
     "port": 6667,
-    "nick": "example",
-    "oauth": "oauth:example",
-    "channel": "#example",
+    "nick": "steelwlng",
+    "oauth": "oauth:yx77dbgaxsjhhghxe60oij7m6w1ymn",
+    "channel": "#steelwlng",
     "channels" : [
-        "#example1",
-        "#example2",
-        "#example3",
-        "#example4",
-        "#example5"
+        "#hyubsama",
+        "#admiralBahroo",
+        "#retrogaijin",
+        "#dansgaming"
+
+
     ]
 }
