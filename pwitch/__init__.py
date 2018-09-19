@@ -1,3 +1,4 @@
 from .PwitchClient import PwitchClient
+from .PwitchUtils import *
 from .Pwitch import *
-__all__ = ['Pwitch']
+__all__ = ['Pwitch', 'PwitchUtils']

@@ -191,20 +191,11 @@ class Pwitch:
                     date = ",".join(str(i) for i in dt.timetuple()[:3]).replace(",","-")
                     time = ":".join(str(i) for i in dt.timetuple()[3:6])
                     d = "M".join([date,time])
-                    self.database.log_chat(name.group(2), d, name.group(3))
-                    #d = "N".join([date,time])
 
-                    ## Check for errors/SQL injections
-                    #try:
-                    #    #self.database.sql_insert(name.group(2), date, time,
-                    #    #    name.group(3))
-
-                    #    print("here")
-                    #    self.database.log_chat(name.group(2), d, name.group(3))
-                    #except:
-                    #    ## Implement logging 
-                    #    print("Unable to log...")
-                    #    pass
+                    try:
+                        self.database.log_chat(name.group(2), d, name.group(3))
+                    except:
+                        print("unable to log")
 
                 ## PwitchServer flag
                 try:

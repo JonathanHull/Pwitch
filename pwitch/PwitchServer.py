@@ -68,7 +68,9 @@ class PwitchServer:
         while self.connected:
             for process,queue,flag in self.process_dict.values():
 
-            ## try to terminate if attempt to close failed.
+                ## try to terminate if attempt to close failed.
+                ## May need to loop through this untill process is successfully
+                ## terminated.
                 if not flag: 
                     process.terminate()
                     time.sleep(0.1)

@@ -20,6 +20,7 @@ Current Support:-
 
 import sqlite3
 import os.path
+from .PwitchUtils import parent_dir
 
 class PwitchLogging:
     def __init__(self,
@@ -42,7 +43,7 @@ class PwitchLogging:
         """
         
         self.ircRoom = ircRoom
-        print(ircRoom)
+        self.log = parent_dir(parent_dir(__file__))
         self.db_path = db_path
         self.db_table = db_table
         self._checkDatabase()
@@ -145,6 +146,7 @@ class PwitchChannelStats(PwitchLogging):
         Pwitch's channel statistics database logging class
         """
         self.db_path = db_path
+        self.log = open(parent_dir(db_path)+"/PwitchChannelStats.log", "w+")
         self.ircRoom = ircRoom
         self.log_rate = log_rate
         self._checkDatabase()
@@ -165,27 +167,29 @@ class PwitchChannelStats(PwitchLogging):
 
         ## Checks if table exists in database.
 
-        self.db_table = "stream_stats"
+        channel_names = ["stream_stats", "pwitch_channel", "chat_log"]
 
-        self.cursor.execute("""
-            SELECT COUNT(*)
-            FROM sqlite_master
-            WHERE type='table'
-            AND name = '{}'
-            """.format(self.db_table))
+        for i in channel_names:
+            self.cursor.execute("""
+                SELECT COUNT(*)
+                FROM sqlite_master
+                WHERE type='table'
+                AND name = '{}'
+                """.format(i))
 
-        if not self.cursor.fetchone()[0] == 1:
-            self._create_tables()
+            if not self.cursor.fetchone()[0] == 1:
+                print("here")
+                self._create_tables()
 
     def _check_table(self):
 
         self.cursor.execute("""
-            SELECT ChannelName
+            SELECT COUNT(ChannelName)
             FROM {}
             WHERE ChannelName = '{}'
             """.format("pwitch_channel", self.ircRoom))
 
-        if not self.cursor.fetchone() == 1:
+        if not self.cursor.fetchone()[0] == 1:
             self.log_channel(self.ircRoom, "FALSE", "FALSE", "FALSE")
 
 
@@ -287,7 +291,7 @@ class PwitchChannelStats(PwitchLogging):
 
         except:
             ## logging module
-            print("something broke")
+            print("[log channel] Something broke")
 
     def log_chat(self, 
             username,
@@ -319,6 +323,8 @@ class PwitchChannelStats(PwitchLogging):
             self.database.commit()
         except:
             ## Log
+            self.log.write("{}|{}|{}|{}".format(channel, username, datetime,
+                message))
             print("[log_chat] Something Broke...")
 
     def log_stream_stats(self,
