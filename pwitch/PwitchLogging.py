@@ -23,6 +23,7 @@ import os.path
 
 class PwitchLogging:
     def __init__(self,
+                 ircRoom,
                  db_path,
                  db_table,
                  ):
@@ -39,7 +40,9 @@ class PwitchLogging:
                variable.sql_insert("username, "date", "time", "message")
 
         """
-
+        
+        self.ircRoom = ircRoom
+        print(ircRoom)
         self.db_path = db_path
         self.db_table = db_table
         self._checkDatabase()
@@ -133,7 +136,7 @@ class PwitchChannelStats(PwitchLogging):
     ## Note: Don't run _create_table everytime new process is initiated
     def __init__(self,
                  db_path,
-                 channel,
+                 ircRoom,
                  log_rate=60,
                  ):
         """
@@ -142,10 +145,12 @@ class PwitchChannelStats(PwitchLogging):
         Pwitch's channel statistics database logging class
         """
         self.db_path = db_path
-        self.channel = channel
+        self.ircRoom = ircRoom
         self.log_rate = log_rate
-        #self._checkDatabase()
-        #self._check_table()
+        self._checkDatabase()
+        self._check_table()
+
+        self.channel_id = self.get_channel_id(ircRoom)
 
     def _checkDatabase(self, *databases):
         """
@@ -169,8 +174,6 @@ class PwitchChannelStats(PwitchLogging):
             AND name = '{}'
             """.format(self.db_table))
 
-        print(self.cursor.fetchone())
-
         if not self.cursor.fetchone()[0] == 1:
             self._create_tables()
 
@@ -180,10 +183,10 @@ class PwitchChannelStats(PwitchLogging):
             SELECT ChannelName
             FROM {}
             WHERE ChannelName = '{}'
-            """.format("pwitch_channel", self.channel))
+            """.format("pwitch_channel", self.ircRoom))
 
         if not self.cursor.fetchone() == 1:
-            self.log_channel(self.channel, "FALSE", "FALSE", "FALSE")
+            self.log_channel(self.ircRoom, "FALSE", "FALSE", "FALSE")
 
 
     def _create_tables(self):
@@ -289,7 +292,10 @@ class PwitchChannelStats(PwitchLogging):
     def log_chat(self, 
             username,
             datetime,
-            message):
+            message,
+            chat_table="chat_log",
+            channel=None,
+            ):
         """
         sql_insert
 
@@ -304,15 +310,16 @@ class PwitchChannelStats(PwitchLogging):
         Note: date/time uses UTC, adjust accordingly.
         Note: All arguments must be of type string.
         """
-        print("here")
+        if channel==None:
+            channel = self.channel_id
         try:
-            self.cursor.execute("INSERT INTO {} (username, datetime, message) \
-                VALUES (?,?,?,?)".format(self.db_table), 
-                (username, date, time, message))
+            self.cursor.execute("INSERT INTO {} VALUES (?,?,?,?)".format(
+                chat_table), (channel, username, datetime, message))
+
             self.database.commit()
         except:
             ## Log
-            print("Something Broke...")
+            print("[log_chat] Something Broke...")
 
     def log_stream_stats(self,
                          channel,
