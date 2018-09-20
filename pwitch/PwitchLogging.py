@@ -138,7 +138,6 @@ class PwitchChannelStats(PwitchLogging):
     def __init__(self,
                  db_path,
                  ircRoom,
-                 log_rate=60,
                  ):
         """
         PwitchChannelStats
@@ -148,13 +147,13 @@ class PwitchChannelStats(PwitchLogging):
         self.db_path = db_path
         self.log = open(parent_dir(db_path)+"/PwitchChannelStats.log", "w+")
         self.ircRoom = ircRoom
-        self.log_rate = log_rate
+        #self.log_rate = log_rate
         self._checkDatabase()
-        self._check_table()
+        self.channel_in_database()
 
         self.channel_id = self.get_channel_id(ircRoom)
 
-    def _checkDatabase(self, *databases):
+    def _checkDatabase(self, *table_list):
         """
         _checkDatabase
 
@@ -167,9 +166,9 @@ class PwitchChannelStats(PwitchLogging):
 
         ## Checks if table exists in database.
 
-        channel_names = ["stream_stats", "pwitch_channel", "chat_log"]
+        tableNames = ["stream_stats","pwitch_channel", "chat_log"]
 
-        for i in channel_names:
+        for i in tableNames:
             self.cursor.execute("""
                 SELECT COUNT(*)
                 FROM sqlite_master
@@ -178,19 +177,35 @@ class PwitchChannelStats(PwitchLogging):
                 """.format(i))
 
             if not self.cursor.fetchone()[0] == 1:
-                print("here")
                 self._create_tables()
 
-    def _check_table(self):
+    def channel_in_database(self, ircRoom=None):
+        """
+        channel_in_database
 
-        self.cursor.execute("""
-            SELECT COUNT(ChannelName)
-            FROM {}
-            WHERE ChannelName = '{}'
-            """.format("pwitch_channel", self.ircRoom))
+        Checks whether the passed channel/list of channels have been defined
+        within the sqlite3 database; and inserts them with the default metadata
+        if not.
 
-        if not self.cursor.fetchone()[0] == 1:
-            self.log_channel(self.ircRoom, "FALSE", "FALSE", "FALSE")
+        Parameter(s):-
+        :param ircRoom:         Channel/List of channels to define.
+        """
+
+        if not ircRoom:
+            ircRoom = self.ircRoom
+
+        if type(ircRoom) != type(list):
+            ircRoom = [ircRoom]
+
+        for channel in ircRoom:
+            self.cursor.execute("""
+                SELECT COUNT(ChannelName)
+                FROM {}
+                WHERE ChannelName = '{}'
+                """.format("pwitch_channel", self.ircRoom))
+
+            if not self.cursor.fetchone()[0] == 1:
+                self.log_channel(channel, "FALSE", "FALSE", "FALSE")
 
 
     def _create_tables(self):
@@ -370,7 +385,76 @@ class PwitchChannelStats(PwitchLogging):
             self.database.commit()
         except:
             print("something broke")
-                         
+
+
+class PwitchStats(PwitchChannelStats):
+    def __init__(self,
+                 db_path,
+                 channels,
+                 update_rate,
+                ):
+        """
+        PwitchStats
+
+        Logs stream statistics into a sqlite3 database.
+        Intended to be ran as a thread alongside Pwitch, but chan be ran
+        independantly.
+
+        Parameters:-
+        :param db_path:         Path to sqlite3 database.
+        :param channels:        List of Twitch channels to monitor.
+        :param update_rate:     Rate of logging (default: 60 seconds).
+        """
+        import requests
+        import time
+
+        self.db_path = db_path
+        self.update_rate = update_rate
+        self._check_database()
+
+        self.check_table
+
+    def start(self):
+        self.connected = True
+
+    def get_statistics(self):
+
+        while self.connected:
+            start_time = time.time()
+            for irc_room in self.irc_rooms:
+                req="https://api.twitch.tv/kraken/streams/{}?client_id={}".format(
+                    irc_room, client_id)
+                data = self.parse_json(req)
+
+                #self.log_stream_stats(
+
+
+            iteration_time = time.time() - start_time
+            time.sleep(self.update_rate - iteration_time)
+
+    def parse_json(self, request):
+        """
+        parse_json
+        Scrapes wanted data from Twitch channel api request.
+
+        Parameters:-
+        :param request:         Twitch API request data.
+        """
+        adict = {}
+
+        adict["datetime"]
+        adict["viewers"] = request["stream"]["viewers"]
+        adict["stream_live"] = request["stream"]["stream_type"]
+        adict["game"] = request["stream"]["channel"]["game"]
+        adict["stream_start"] = request["stream"]["created_at"]
+        adict["total_viewers"] = request["stream"]["channel"]["viewers"]
+        adict["total_followers"] = request["stream"]["channel"]["followers"]
+
+        return adict
+
+
+
+
 
 def get_date_time():
     pass
