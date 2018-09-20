@@ -18,9 +18,14 @@ Current Support:-
 ## Sqlcommit only every hour.
 ## Maybe make table construction / insetion names global or part of self.
 
+import requests
 import sqlite3
 import os.path
-from .PwitchUtils import parent_dir
+import json
+import time
+
+#from .PwitchUtils import parent_dir
+from PwitchUtils import parent_dir
 
 class PwitchLogging:
     def __init__(self,
@@ -137,7 +142,7 @@ class PwitchChannelStats(PwitchLogging):
     ## Note: Don't run _create_table everytime new process is initiated
     def __init__(self,
                  db_path,
-                 ircRoom,
+                 channels,
                  ):
         """
         PwitchChannelStats
@@ -146,14 +151,14 @@ class PwitchChannelStats(PwitchLogging):
         """
         self.db_path = db_path
         self.log = open(parent_dir(db_path)+"/PwitchChannelStats.log", "w+")
-        self.ircRoom = ircRoom
+        self.channels = channels
         #self.log_rate = log_rate
-        self._checkDatabase()
+        self._check_database()
         self.channel_in_database()
 
-        self.channel_id = self.get_channel_id(ircRoom)
+        self.channel_id = self.get_channel_id(channels)
 
-    def _checkDatabase(self, *table_list):
+    def _check_database(self, *table_list):
         """
         _checkDatabase
 
@@ -179,7 +184,7 @@ class PwitchChannelStats(PwitchLogging):
             if not self.cursor.fetchone()[0] == 1:
                 self._create_tables()
 
-    def channel_in_database(self, ircRoom=None):
+    def channel_in_database(self, channels=None):
         """
         channel_in_database
 
@@ -188,21 +193,21 @@ class PwitchChannelStats(PwitchLogging):
         if not.
 
         Parameter(s):-
-        :param ircRoom:         Channel/List of channels to define.
+        :param channels:         Channel/List of channels to define.
         """
 
-        if not ircRoom:
-            ircRoom = self.ircRoom
+        if not channels:
+            channels = self.channels
 
-        if type(ircRoom) != type(list):
-            ircRoom = [ircRoom]
+        if type(channels) != list:
+            channels = [channels]
 
-        for channel in ircRoom:
+        for channel in channels:
             self.cursor.execute("""
                 SELECT COUNT(ChannelName)
                 FROM {}
                 WHERE ChannelName = '{}'
-                """.format("pwitch_channel", self.ircRoom))
+                """.format("pwitch_channel", channel))
 
             if not self.cursor.fetchone()[0] == 1:
                 self.log_channel(channel, "FALSE", "FALSE", "FALSE")
@@ -230,7 +235,7 @@ class PwitchChannelStats(PwitchLogging):
             CONSTRAINT name_unique UNIQUE (ChannelName)
         )""".format("pwitch_channel"))
 
-        ## Logs messages from ircRoom
+        ## Logs messages from channels
         self.cursor.execute("""
             CREATE TABLE {} (
             ChannelId       INTEGER, 
@@ -343,14 +348,16 @@ class PwitchChannelStats(PwitchLogging):
             print("[log_chat] Something Broke...")
 
     def log_stream_stats(self,
-                         channel,
-                         viewers,
-                         stream_live,
-                         game,
-                         stream_start,
-                         total_viewers,
-                         total_followers,
-                         date_time,
+                         #channel,
+                         #viewers,
+                         #stream_live,
+                         #game,
+                         #stream_start,
+                         #total_viewers,
+                         #total_followers,
+                         #date_time,
+                         data,
+                         channel_id,
                          table_name="stream_stats"
                         ):
 
@@ -369,19 +376,18 @@ class PwitchChannelStats(PwitchLogging):
         :param date_time:       The DATETIME when channel data was collected.
         :param table_name:      Table name -- Helper variable; contigent.
         """
-
-        channel_id = self.get_channel_id(channel)
-        if not channel_id:
-            ## Log; this shouldn't happen.
-            ## Create channel id.
-            pass
+        data = [x for x in data.values()]
+        data.insert(0, channel_id)
 
         try:
             self.cursor.execute("INSERT INTO {} (ChannelId, DateTime, Viewers,\
                 StreamLive, Game, StreamStart, TotalViewers, \
-                Followers) VALUES (?,?,?,?,?,?,?,?)".format(table_name),
-                (channel_id, date_time, viewers, stream_live, game, 
-                    stream_start, total_viewers, total_followers))
+                Followers) VALUES \
+                (?,?,?,?,?,?,?,?)".format(table_name), data)
+
+                #(x for x in data))
+            #    (channel_id, date_time, viewers, stream_live, game, 
+            #        stream_start, total_viewers, total_followers))
             self.database.commit()
         except:
             print("something broke")
@@ -391,6 +397,7 @@ class PwitchStats(PwitchChannelStats):
     def __init__(self,
                  db_path,
                  channels,
+                 api_key,
                  update_rate,
                 ):
         """
@@ -403,57 +410,105 @@ class PwitchStats(PwitchChannelStats):
         Parameters:-
         :param db_path:         Path to sqlite3 database.
         :param channels:        List of Twitch channels to monitor.
+        :param api_key:         Pwitch api key.
         :param update_rate:     Rate of logging (default: 60 seconds).
         """
-        import requests
-        import time
 
         self.db_path = db_path
+        self.channels = channels
+        self.api_key = api_key
         self.update_rate = update_rate
-        self._check_database()
-
-        self.check_table
 
     def start(self):
         self.connected = True
+        ## Check tables constructed / channels logged in database.
+        self._check_database()
+        self.channel_in_database(self.channels)
 
-    def get_statistics(self):
+        channel_ids = self.pair_channelid_channelname(self.channels)
+        self.main(channel_ids)
 
+    def stop(self):
+        self.connected = False
+
+    def pair_channelid_channelname(self,channels=None):
+        """
+        pair_channelid_channelname
+
+        Returns list of tuples of passed channels
+        Format - [(channel_name, channel_id)]
+        """
+        if not channels:
+            channels = self.channels
+        if type(channels) != list:
+            channels = [channels]
+
+        out_list = []
+        for i in channels:
+            out_list.append((i, self.get_channel_id(i)))
+
+        return out_list
+
+    def extend_channel_list(self, channels):
+        """
+        extend_channel_list
+
+        Extends the self.irc_rooms variable for use in te get_statistics method.
+        Allows additional channels to be added during thread runtime.
+
+        parameters:-
+        :param channels:        List of Twitch channels to add to monitor list.
+        """
+        pass
+
+    def main(self, channel_ids):
+        """
+        main
+
+        Logs statistics of specified Twitch channels into sqlite3 database
+        table. Can be ran independantly of main Pwitch process.
+        """
+        print(channel_ids)
         while self.connected:
             start_time = time.time()
-            for irc_room in self.irc_rooms:
+            for channel in channel_ids:
+                print(channel)
                 req="https://api.twitch.tv/kraken/streams/{}?client_id={}".format(
-                    irc_room, client_id)
-                data = self.parse_json(req)
+                    channel[0], self.api_key)
 
-                #self.log_stream_stats(
-
+                streamer_html = requests.get(req)
+                raw_data = json.loads(streamer_html.text)
+                data = self.parse_json(raw_data)
+                if data == None:
+                    continue
+                self.log_stream_stats(data, channel[1])
 
             iteration_time = time.time() - start_time
             time.sleep(self.update_rate - iteration_time)
 
-    def parse_json(self, request):
+    def parse_json(self, raw_data):
         """
         parse_json
         Scrapes wanted data from Twitch channel api request.
 
         Parameters:-
-        :param request:         Twitch API request data.
+        :param raw_data:         Twitch API request data.
         """
+
+        if raw_data["stream"] == None:
+            return None
+
         adict = {}
 
-        adict["datetime"]
-        adict["viewers"] = request["stream"]["viewers"]
-        adict["stream_live"] = request["stream"]["stream_type"]
-        adict["game"] = request["stream"]["channel"]["game"]
-        adict["stream_start"] = request["stream"]["created_at"]
-        adict["total_viewers"] = request["stream"]["channel"]["viewers"]
-        adict["total_followers"] = request["stream"]["channel"]["followers"]
+        adict["datetime"] = 1
+        adict["viewers"] = raw_data["stream"]["viewers"]
+        adict["stream_live"] = raw_data["stream"]["stream_type"]
+        adict["game"] = raw_data["stream"]["channel"]["game"]
+        adict["stream_start"] = raw_data["stream"]["created_at"]
+        adict["total_viewers"] = raw_data["stream"]["channel"]["views"]
+        adict["total_followers"] = raw_data["stream"]["channel"]["followers"]
 
         return adict
-
-
-
 
 
 def get_date_time():
@@ -462,19 +517,30 @@ def get_date_time():
 
 
 if __name__ == "__main__":
-    import datetime
+
     db_path = "test.db"
-    db_object = PwitchChannelStats("test.db")
+    db_object = PwitchStats(db_path, ["dansgaming", "zfg1",
+    "hyubsama","Borjoyze"],
+            "cvlwzo59od73g9rbdmkjah896peib7",20)
 
-    dt = datetime.datetime.utcnow()
-    date = ",".join(str(i) for i in dt.timetuple()[:3])
-    time = ":".join(str(i) for i in dt.timetuple()[3:6])
-    datetime = "M".join([date,time])
+    db_object.start()
 
-    db_object.log_channel("Steelwlng", "TRUE", "TRUE", "TRUE")
-    db_object.log_channel("meme", "TRUE", "TRUE", "TRUE")
-    db_object.log_channel("hihi", "TRUE", "TRUE", "TRUE")
-    
-    db_object.log_stream_stats("Steelwlng",
-            200,"TRUE","test", "2018-10-10M7:00:00",
-            3000,3000,"2018-10-10M8:00:00")
+
+
+
+    #import datetime
+    #db_path = "test.db"
+    #db_object = PwitchChannelStats("test.db")
+
+    #dt = datetime.datetime.utcnow()
+    #date = ",".join(str(i) for i in dt.timetuple()[:3])
+    #time = ":".join(str(i) for i in dt.timetuple()[3:6])
+    #datetime = "M".join([date,time])
+
+    #db_object.log_channel("Steelwlng", "TRUE", "TRUE", "TRUE")
+    #db_object.log_channel("meme", "TRUE", "TRUE", "TRUE")
+    #db_object.log_channel("hihi", "TRUE", "TRUE", "TRUE")
+    #
+    #db_object.log_stream_stats("Steelwlng",
+    #        200,"TRUE","test", "2018-10-10M7:00:00",
+    #        3000,3000,"2018-10-10M8:00:00")
