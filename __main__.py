@@ -1,4 +1,4 @@
-    #!/usr/bin/env python3
+#!/usr/bin/env python3
 
 import argparse
 import signal
@@ -6,12 +6,13 @@ import json
 import sys
 import os
 
+import time
+
 from pwitch import Pwitch, PwitchClient
 from pwitch.PwitchServer import PwitchServer
 from argparse import RawTextHelpFormatter as RTHF
 
-## include argparse argument to create filepath to file containing irc channels
-## to create objects for.
+## Use signal to handle kill signal passed by docker for graceful shutdown.
 
 def argument_parser(args):
     parser = argparse.ArgumentParser(description="Pwitch IRC bot service",
@@ -36,7 +37,7 @@ def main():
     ## Bot / Client settings
 
     if args.service == "server":
-        irc_channels = cfg["channels"]
+        irc_channels = [x.lstrip("#") for x in cfg["channels"]]
         global PwitchMaster
         PwitchMaster = PwitchServer(cfg, irc_channels)
         PwitchMaster.start()

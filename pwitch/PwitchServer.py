@@ -66,25 +66,33 @@ class PwitchServer:
         """
         ## Extensive logging required.
         while self.connected:
-            for process,queue,flag in self.process_dict.values():
+            remove = []
+            for key, values in self.process_dict.items():
+                process, queue, flag = values
 
                 ## try to terminate if attempt to close failed.
                 ## May need to loop through this untill process is successfully
                 ## terminated.
                 if not flag: 
                     process.terminate()
-                    time.sleep(0.1)
+                    time.sleep(0.2)
                     if not process.is_alive():
+                        print(1)
+                        remove.append(key)
                         process.join(timeout=1.0)
                         queue.close()
-                        self.process_dict.pop(i)
                         continue
 
                 if not process.is_alive():
                     ## restart dead process
                     pass
 
-                time.sleep(0.1)
+            ## Removes any stopped processes after iterating through process dict.
+            for i in remove:
+                self.process_dict.pop(i)
+
+            time.sleep(0.2)
+
 
     def _create_process_dict(self):
         """
@@ -138,19 +146,22 @@ class PwitchServer:
         for i in process_dict.keys():
             process_dict[i][0].name = i
             process_dict[i][0].start()
-            print("[CONNECTED] {}".format(i.lstrip("#")))
+            print("[CONNECTED] {}".format(i))
 
-    def stop_process(self, pwitch_process):
+    def stop_process(self, channel_name):
         """
         stop_process
 
         Parameters:-
-        :param pwitch_process:         list containing process and Queue.
+        :param pwitch_process:  Twitch channel name to stop pwitch.
         """
-
-        pwitch_process[1].put(False)
+        self.process_dict[channel_name][1].put(False)
         time.sleep(0.1)
-        self.connected = False
+        self.process_dict[channel_name][2] = False
+
+        if all([x[2] is False for x in self.process_dict.values()]):
+            self.connected = False
+
         ## Watchdog to make sure it shuts down
 
     def stop_processes(self):
@@ -166,6 +177,7 @@ class PwitchServer:
         else:
             for i in self.process_dict.keys():
                 self.process_dict[i][1].put(False)
+                self.process_dict[i][2] = False
                 if self.verbose:
                     print("[DISCONNECTED] {}".format(i))
 
