@@ -356,7 +356,6 @@ class PwitchStats(PwitchLogging):
         while self.connected:
             start_time = time.time()
             for channel in channel_ids:
-                print(channel)
                 req="https://api.twitch.tv/kraken/streams/{}?client_id={}".format(
                     channel[0], self.api_key)
 

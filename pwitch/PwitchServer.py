@@ -3,6 +3,7 @@
 import time
 
 from .Pwitch import Pwitch
+from .PwitchLogging import PwitchStats
 from threading import Thread
 from multiprocessing import Process, Queue
 
@@ -17,6 +18,7 @@ class PwitchServer:
                  cfg, 
                  channels,
                  verbose = True,
+                 channel_stats=True,
                  timeout = 10,
                  ):
         """
@@ -31,14 +33,21 @@ class PwitchServer:
         :param channels:        List of irc channels to monitor - Check
                                 cfg/irc_channels.json
         :param verbose:         Enable verbose output.
+        :param channel_stats:   Enable logging of channel statistics (Bool).
         :param timeout:         Set max hang time for threads. [Implement]
         """
 
         self.cfg = cfg
         self.channels = channels
         self.verbose = verbose
+        self.channel_stats = channel_stats
         self.timeout = timeout
+
         self.connected = True     # watchdog thread flag
+
+        if self.channel_stats:
+            self.db_path = cfg["db_path"]
+            self.api_key = cfg["api_key"]
 
     def start(self):
         """
@@ -52,6 +61,13 @@ class PwitchServer:
         ## Watchdog thread -- Monitors process status.
         watchdog_thread = Thread(target=self.watchdog)
         watchdog_thread.start()
+
+        ## Channel statistics process -- Gathers statistics on Twitch channels.
+        if self.channel_stats:
+            db_path = self.cfg["db_path"]
+            channel_stats = PwitchStats(db_path, self.channels, self.api_key)
+            channel_stats_process = Process(target=channel_stats.start)
+            channel_stats_process.start()
 
 
     def watchdog(self, timeout=10):
