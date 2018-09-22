@@ -25,120 +25,9 @@ import json
 import time
 
 #from .PwitchUtils import parent_dir
-from PwitchUtils import parent_dir
+from .PwitchUtils import parent_dir, get_datetime
 
 class PwitchLogging:
-    def __init__(self,
-                 ircRoom,
-                 db_path,
-                 db_table,
-                 ):
-        """
-        PwitchLogging
-
-        Pwitch's chat logging database class.
-
-        Parameters:-
-        :param db_path:     Path to database.
-        :param db_table:    IRC Chatroom logging table i.e. chatroom name.
-
-        Usage: variable = PwitchLogging(db_path, db_table)
-               variable.sql_insert("username, "date", "time", "message")
-
-        """
-        
-        self.ircRoom = ircRoom
-        self.log = parent_dir(parent_dir(__file__))
-        self.db_path = db_path
-        self.db_table = db_table
-        self._checkDatabase()
-
-    def _checkDatabase(self, *databases):
-        """
-        _checkDatabase
-
-        Creates/Connects to database file.
-        Checks for existance of database table and creates if needed.
-        """
-
-        self.database = sqlite3.connect(self.db_path)
-        self.cursor = self.database.cursor()
-
-        ## Checks if table exists in database.
-
-        self.cursor.execute("""
-            SELECT COUNT(*)
-            FROM sqlite_master
-            WHERE type='table'
-            AND name = '{}'
-            """.format(self.db_table))
-
-        if not self.cursor.fetchone()[0] == 1:
-            self._create_table()
-
-    def sql_insert(self, 
-            username,
-            datetime,
-            message):
-        """
-        sql_insert
-
-        Inserts chat messages into database table.
-
-        Parameters:-
-        :param username:    Message senders username.
-        :param date:        Date message was sent.
-        :param time:        Time message was sent.
-        :param message:     Chat message.
-        
-        Note: date/time uses UTC, adjust accordingly.
-        Note: All arguments must be of type string.
-        """
-
-        try:
-            self.cursor.execute("INSERT INTO {} VALUES (?,?,?)".format(
-                self.db_table), (username, datetime, message))
-            self.database.commit()
-        except:
-            print("Something Broke...")
-
-
-    def sql_read(self,
-            username,
-            date=None):
-
-        """
-        sql_read
-
-        Queries sql database for messages from specific user.
-
-        Parameters:-
-        :param username:    Username to query database.
-        :param date:        Optional parameter to search within specific data.
-        :param time:        Optional paramater to search within specific time.
-
-        Usage: object.sql_read("USERNAME")
-        """
-
-        return None
-
-    def _create_table(self):
-        """
-        _create_table
-
-        Initialises Pwitch chat logging database if not predefined.
-        """
-
-        self.cursor.execute("""
-           CREATE TABLE {} (
-           USERNAME text   NOT NULL, 
-           DATE DATE       NOT NULL,
-           TIME TIME       NOT NULL, 
-           MESSAGE text    NOT NULL
-           )""".format(self.db_table))
-
-
-class PwitchChannelStats(PwitchLogging):
     ## Note: Don't run _create_table everytime new process is initiated
     def __init__(self,
                  db_path,
@@ -356,7 +245,7 @@ class PwitchChannelStats(PwitchLogging):
                          #total_viewers,
                          #total_followers,
                          #date_time,
-                         data,
+                         data_dict,
                          channel_id,
                          table_name="stream_stats"
                         ):
@@ -376,7 +265,7 @@ class PwitchChannelStats(PwitchLogging):
         :param date_time:       The DATETIME when channel data was collected.
         :param table_name:      Table name -- Helper variable; contigent.
         """
-        data = [x for x in data.values()]
+        data = [x for x in data_dict.values()]
         data.insert(0, channel_id)
 
         try:
@@ -385,20 +274,17 @@ class PwitchChannelStats(PwitchLogging):
                 Followers) VALUES \
                 (?,?,?,?,?,?,?,?)".format(table_name), data)
 
-                #(x for x in data))
-            #    (channel_id, date_time, viewers, stream_live, game, 
-            #        stream_start, total_viewers, total_followers))
             self.database.commit()
         except:
             print("something broke")
 
 
-class PwitchStats(PwitchChannelStats):
+class PwitchStats(PwitchLogging):
     def __init__(self,
                  db_path,
                  channels,
                  api_key,
-                 update_rate,
+                 update_rate=60
                 ):
         """
         PwitchStats
@@ -468,7 +354,6 @@ class PwitchStats(PwitchChannelStats):
         Logs statistics of specified Twitch channels into sqlite3 database
         table. Can be ran independantly of main Pwitch process.
         """
-        print(channel_ids)
         while self.connected:
             start_time = time.time()
             for channel in channel_ids:
@@ -500,7 +385,7 @@ class PwitchStats(PwitchChannelStats):
 
         adict = {}
 
-        adict["datetime"] = 1
+        adict["datetime"] = get_datetime();
         adict["viewers"] = raw_data["stream"]["viewers"]
         adict["stream_live"] = raw_data["stream"]["stream_type"]
         adict["game"] = raw_data["stream"]["channel"]["game"]
@@ -510,37 +395,11 @@ class PwitchStats(PwitchChannelStats):
 
         return adict
 
-
-def get_date_time():
-    pass
-                          
-
-
 if __name__ == "__main__":
 
-    db_path = "test.db"
+    db_path = "memes_now.db"
     db_object = PwitchStats(db_path, ["dansgaming", "zfg1",
     "hyubsama","Borjoyze"],
-            "cvlwzo59od73g9rbdmkjah896peib7",20)
+            "cvlwzo59od73g9rbdmkjah896peib7")
 
     db_object.start()
-
-
-
-
-    #import datetime
-    #db_path = "test.db"
-    #db_object = PwitchChannelStats("test.db")
-
-    #dt = datetime.datetime.utcnow()
-    #date = ",".join(str(i) for i in dt.timetuple()[:3])
-    #time = ":".join(str(i) for i in dt.timetuple()[3:6])
-    #datetime = "M".join([date,time])
-
-    #db_object.log_channel("Steelwlng", "TRUE", "TRUE", "TRUE")
-    #db_object.log_channel("meme", "TRUE", "TRUE", "TRUE")
-    #db_object.log_channel("hihi", "TRUE", "TRUE", "TRUE")
-    #
-    #db_object.log_stream_stats("Steelwlng",
-    #        200,"TRUE","test", "2018-10-10M7:00:00",
-    #        3000,3000,"2018-10-10M8:00:00")

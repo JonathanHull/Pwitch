@@ -180,13 +180,6 @@ class Pwitch:
                         sys.stdout.flush()
 
                 if self.logging and name:
-                    ## Imporve PwitchLogging to detect database used, rewrite to
-                    ## allow to write using same syntax.
-                    dt = datetime.utcnow()
-                    date = ",".join(str(i) for i in dt.timetuple()[:3]).replace(",","-")
-                    time = ":".join(str(i) for i in dt.timetuple()[3:6])
-                    d = "M".join([date,time])
-
                     try:
                         self.database.log_chat(name.group(2), get_datetime(), name.group(3))
                     except:
@@ -218,7 +211,7 @@ class Pwitch:
                     os.mkdir(db_path)
                 db_path = db_dir+"pwitch.db"
             #self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
-            self.database = PwitchChannelStats(db_path, self.ircRoom.lstrip('#'))
+            self.database = PwitchLogging(db_path, self.ircRoom.lstrip('#'))
 
     def chatCommand(self):
         pass
