@@ -2,19 +2,14 @@
 
 import socket
 import select
-import readline
+import readline # Remove - Use ncurses instead.
+import sys
 import os
 import re
-import sys
 
 from .PwitchLogging import *
+from .PwitchUtils import parent_dir, get_datetime
 
-#if __name__ == "__main__":
-#    from PwitchLogging import *
-#else:
-#    from .PwitchLogging import *
-
-from .PwitchUtils import parent_dir
 from threading import Thread
 from datetime import datetime
 from time import sleep
@@ -193,7 +188,7 @@ class Pwitch:
                     d = "M".join([date,time])
 
                     try:
-                        self.database.log_chat(name.group(2), d, name.group(3))
+                        self.database.log_chat(name.group(2), get_datetime(), name.group(3))
                     except:
                         print("unable to log")
 
