@@ -125,7 +125,7 @@ class PwitchServer:
         :param ircRoom:         Channel for Pwitch to monitor.
         """
         q = Queue()
-        a = Pwitch(username, oauth, i, process_queue=q)
+        a = Pwitch(username, oauth, ircRoom, process_queue=q)
 
         ## Note: Final True is a flag for the watchdog method.
         self.process_dict[ircRoom] = [Process(target=a.start), q, True]
@@ -185,17 +185,3 @@ class PwitchServer:
 
         ## use watchdog to see if threads close properly
         ## Join threads
-
-if __name__ == "__main__":
-     import json
-     cfg_dir = "/home/jonathan/projects/Pwitch/cfg/"
-     cfg = cfg_dir+"cfg.json"
-     channels = cfg_dir+"irc_channels.json"
-
-     with open(cfg, 'r') as w:
-         cfg = json.load(w)
-
-     channel_list = cfg["channels"]
-
-     ob = PwitchServer(bot_cfg, channel_list)
-     ob.startThreads()

@@ -1,9 +1,6 @@
 #!/usr/bin/env python3.5
 
-import argparse
 import threading
-import json
-import sys
 import re
 
 from .Pwitch import Pwitch

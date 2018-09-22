@@ -20,7 +20,6 @@ Current Support:-
 
 import requests
 import sqlite3
-import os.path
 import json
 import time
 
