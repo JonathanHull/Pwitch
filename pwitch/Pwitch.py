@@ -10,10 +10,6 @@ import re
 from .PwitchLogging import *
 from .PwitchUtils import parent_dir, get_datetime
 
-from threading import Thread
-from datetime import datetime
-from time import sleep
-
 ## Pwitch main module.
 
 ## incorporate loyalty points
@@ -35,10 +31,11 @@ class Pwitch:
                 host="irc.twitch.tv",
                 port=6667,
                 logging=True,
+                admin=False,
                 userBuffer=False,
                 chatCommands=None,
                 loyaltyMode=False,
-                process_queue=None
+                process_queue=None,
                 ):
 
         """
@@ -46,22 +43,20 @@ class Pwitch:
         Parent Pwitch package class.
 
         Parameters:-
-        :param username:   Twitch account username.
-        :param oauth:      Twitch account OAuth token.
-        :param ircRoom:    Twitch IRC room to connect to.
-        :param updateRate: Limit number of connections to twitch server (per sec).
-        :param verbose:    Turn on verbose output : Boolean.
-        :param host:       The Twitch IRC sever (irc.twitch.tv).
-        :param port:       Port to connect to server (6667).
-        :param logging:    Toggle chat logging (Default False). Options are:
+        :param username:        Twitch account username.
+        :param oauth:           Twitch account OAuth token.
+        :param ircRoom:         Twitch IRC room to connect to.
+        :param updateRate:      Limit number of connections to twitch server (per sec).
+        :param verbose:         Turn on verbose output (Default: False).
+        :param host:            The Twitch IRC sever (irc.twitch.tv).
+        :param port:            Port to connect to server (6667).
+        :param logging:         Toggle chat logging. Options are:
             - True (Log to log/pwitch.db).
             - FILE (log to specified file).
+        :param admin:           Enable administration of ircRoom.
 
-        Note: verbose/logging False by default.
+        Note: Default stat_rate is 60 seconds.
         Note: updateRate default = 10/30 (30 commands per 10 secs).
-
-        Usage: x = Pwitch("Twitch_username", "oauth_token", "#ircRoom", True|False)
-               x.ban("Twitch_username")
         """
 
         self.username = username
@@ -72,13 +67,14 @@ class Pwitch:
         self.host = host
         self.port = port
         self.logging = logging
-        self.autolog = False
-        self.userBuffer = userBuffer
+        self.admin = admin
+
         self.chatCommands = chatCommands
         self.mod_only_mode = False
         self.sock = self.connectIRC()
         self.process_queue = process_queue
 
+        self.userBuffer = userBuffer
         self.connected = True
 
     def start(self):
@@ -180,10 +176,10 @@ class Pwitch:
                         sys.stdout.flush()
 
                 if self.logging and name:
-                    try:
-                        self.database.log_chat(name.group(2), get_datetime(), name.group(3))
-                    except:
-                        print("unable to log")
+                    self.database.log_chat(name.group(2), get_datetime(), name.group(3))
+
+                if self.admin and name:
+                    pass
 
                 ## PwitchServer flag
                 try:
@@ -191,9 +187,6 @@ class Pwitch:
                 except:
                     pass
 
-        #if self.moderating:
-        #    pass
-                    
     def _createLogDirectory(self):
         """
         _createLogDirectory
