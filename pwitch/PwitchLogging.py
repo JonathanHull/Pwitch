@@ -29,7 +29,7 @@ from .PwitchUtils import parent_dir, get_datetime
 class PwitchDatabase:
     def __init__(self,
                  db_path,
-                 channel_list;
+                 channel_list,
                 ):
 
         """
@@ -41,13 +41,16 @@ class PwitchDatabase:
         :param channel_list:    List of channels to monitor.
         """
         self.db_path = db_path
-        self.channel_list = channel_list
+        self.channel_list = [x.lstrip("#") for x in channel_list]
         self.database = sqlite3.connect(self.db_path)
         self.cursor = self.database.cursor()
 
-    def check_database(self):
+        self.initialise()
+        self.add_channels()
+
+    def initialise(self, table_list=None):
         """
-        check_database
+        initialise
 
         Check self.db_path exists and has the correct tables
         Paramters:-
@@ -56,15 +59,15 @@ class PwitchDatabase:
         missing_tables = []
 
         if table_list == None:
-            table_names = ["stream_stats", "pwitch_channel", "chat_log"]
+            table_list = ["stream_stats", "pwitch_channel", "chat_log"]
 
         for i in table_list:
             self.cursor.execute("""
                 SELECT COUNT(*)
                 FROM sqlite_master
                 WHERE type='table'
-                AND name = '?'
-            """, (i))
+                AND name = (?)
+            """, (i,))
 
             if not self.cursor.fetchone()[0] == 1:
                 missing_tables.append(i)
@@ -126,185 +129,6 @@ class PwitchDatabase:
                 FOREIGN KEY (ChannelID) REFERENCES pwitch_channel(ChannelId)
             )""".format("stream_stats"))
 
-
-    def add_channel(self, channel):
-        """
-        add_channel
-        Add a twitch channel to the sqlite3 database.
-
-        Parameters:-
-        :param channels:         List of channels to be added to the pwitch databse.
-        """
-
-        if not channels:
-            channels = self.channel_list
-
-        if type(channel) != list:
-            channel = [channel]
-
-        for channel in channels:
-            self.cursor.execute("""
-                SELECT COUNT(ChannelName)
-                FROM {}
-                WHERE ChannelName = '{}'
-                """.format("pwitch_channel", channel))
-
-            if not self.cursor.fetchone()[0] == 1:
-                self.log_channel(channel, "FALSE", "FALSE", "FALSE")
-
-
-class PwitchLogging:
-    ## Note: Don't run _create_table everytime new process is initiated
-    def __init__(self,
-                 db_path,
-                 channels,
-                 ):
-        """
-        PwitchChannelStats
-        
-        Pwitch's channel statistics database logging class
-        """
-        self.db_path = db_path
-        self.log = open(parent_dir(db_path)+"/PwitchChannelStats.log", "w+")
-        self.channels = channels
-        #self.log_rate = log_rate
-        self._check_database()
-        self.channel_in_database()
-
-        self.channel_id = self.get_channel_id(channels)
-
-    def _check_database(self, *table_list):
-        """
-        _checkDatabase
-
-        Creates/Connects to database file.
-        Checks for existance of database table and creates if needed.
-        """
-
-        self.database = sqlite3.connect(self.db_path)
-        self.cursor = self.database.cursor()
-
-        ## Checks if table exists in database.
-
-        #tableNames = ["stream_stats","pwitch_channel", "chat_log"]
-        tableNames = ["pwitch_channel", "chat_log","stream_stats"]
-
-        for i in tableNames:
-            self.cursor.execute("""
-                SELECT COUNT(*)
-                FROM sqlite_master
-                WHERE type='table'
-                AND name = '{}'
-                """.format(i))
-
-            if not self.cursor.fetchone()[0] == 1:
-                self._create_tables()
-
-    def channel_in_database(self, channels=None):
-        """
-        channel_in_database
-
-        Checks whether the passed channel/list of channels have been defined
-        within the sqlite3 database; and inserts them with the default metadata
-        if not.
-
-        Parameter(s):-
-        :param channels:         Channel/List of channels to define.
-        """
-
-        if not channels:
-            channels = self.channels
-
-        if type(channels) != list:
-            channels = [channels]
-
-        for channel in channels:
-            self.cursor.execute("""
-                SELECT COUNT(ChannelName)
-                FROM {}
-                WHERE ChannelName = '{}'
-                """.format("pwitch_channel", channel))
-
-            if not self.cursor.fetchone()[0] == 1:
-                self.log_channel(channel, "FALSE", "FALSE", "FALSE")
-
-
-    def _create_tables(self):
-        """
-        _create_table
-
-        Initialises Pwitch Channel Statistics logging database if not
-        predefined.
-        """
-
-        ## Could check to see whether each table exists independantly incase
-        ## user accidentally removed one (only for chat_log, stream_stats).
-
-        ## Records static channel properties
-        self.cursor.execute("""
-            CREATE TABLE {} (
-            ChannelId       INTEGER     PRIMARY KEY AUTOINCREMENT,
-            ChannelName     VARCHAR     NOT NULL,
-            IsAdmin         BOOL        NOT NULL,
-            IsLog           BOOL        NOT NULL,
-            PwitchAdmin     BOOL        NOT NULL,
-            CONSTRAINT name_unique UNIQUE (ChannelName)
-        )""".format("pwitch_channel"))
-
-        ## Logs messages from channels
-        self.cursor.execute("""
-            CREATE TABLE {} (
-            ChannelId       INTEGER, 
-            UserName        VARCHAR     NOT NULL,
-            DateTime        DATETIME    NOT NULL,
-            Message         VARCHAR     NOT NULL,
-            FOREIGN KEY (ChannelId) REFERENCES pwitch_channel(ChannelId)
-        )""".format("chat_log"))
-
-        ## Monitors channel statistics i.e. viewer count over a stream.
-        ## Logs statistics at user defined rate (self.log_rate).
-        self.cursor.execute("""
-            CREATE TABLE {} (
-            RecordId        INTEGER     PRIMARY KEY AUTOINCREMENT,
-            ChannelId       INTEGER,
-            DateTime        DATETIME    NOT NULL,   
-            Viewers         INT         NOT NULL,
-            StreamLive      BOOL        NOT NULL,
-            Game            VARCHAR     NOT NULL,
-            StreamStart     DATETIME    NOT NULL,
-            TotalViewers    INT         NOT NULL,
-            Followers       INT         NOT NULL,
-            FOREIGN KEY (ChannelID) REFERENCES pwitch_channel(ChannelId)
-        )""".format("stream_stats"))
-
-    def update_channel_tables(self):
-        """
-        update_channel_tables
-        Updates the static channel data. This should be ran every 24 hours or
-        when a chat command indicates change.
-        """
-
-        ## Write function in Pwitch.py which
-        pass
-
-
-    def get_channel_id(self, channel_name):
-        """
-        get_channel_id
-        Get channel identifier from channel database
-
-        Parameters:-
-        :param channel_name:     Channel name.
-        """
-        try:
-            self.cursor.execute("""
-                SELECT ChannelId FROM pwitch_channel \
-                WHERE ChannelName=?""", (channel_name,))
-            channel_id = self.cursor.fetchone()[0]
-        except:
-            channel_id = None
-        return channel_id
-
     def log_channel(self,
                     channel_name,
                     is_bot_admin,
@@ -328,6 +152,73 @@ class PwitchLogging:
         #except:
         #    ## logging module
         #    print("[log channel] Something broke")
+
+
+    def add_channels(self, channels=None):
+        """
+        add_channel
+        Add a twitch channel to the sqlite3 database.
+
+        Parameters:-
+        :param channels:        List of channels to be added to the pwitch databse.
+                                Note: if channel=None: loads self.channels
+        """
+
+        if not channels:
+            channels = self.channel_list
+
+        if type(channels) != list:
+            channels = [channels]
+
+        for channel in channels:
+            self.cursor.execute("""
+                SELECT COUNT(ChannelName)
+                FROM {}
+                WHERE ChannelName = '{}'
+                """.format("pwitch_channel", channel))
+
+            if not self.cursor.fetchone()[0] == 1:
+                self.log_channel(channel, "FALSE", "FALSE", "FALSE")
+
+    def get_channel_id(self, channel_name):
+        """
+        get_channel_id
+        Get channel identifier from channel database
+
+        Parameters:-
+        :param channel_name:     Channel name.
+        """
+        try:
+            self.cursor.execute("""
+                SELECT ChannelId FROM pwitch_channel \
+                WHERE ChannelName=?""", (channel_name,))
+            channel_id = self.cursor.fetchone()[0]
+        except:
+            channel_id = None
+        return channel_id
+
+class PwitchLogging(PwitchDatabase):
+    ## Note: Don't run _create_table everytime new process is initiated
+    def __init__(self,
+                 db_path,
+                 channel,
+                 ):
+        """
+        PwitchChannelStats
+        
+        Pwitch's channel statistics database logging class
+        """
+        self.db_path = db_path
+        self.log = open(parent_dir(db_path)+"/PwitchChannelStats.log", "w+")
+        self.channel_list = channel
+
+        ## Connect to database
+        self.database = sqlite3.connect(self.db_path)
+        self.cursor = self.database.cursor()
+
+        ## Add channel to database / get channel_id
+        self.add_channels()
+        self.channel_id = self.get_channel_id(channel)
 
     def log_chat(self, 
             username,
@@ -362,6 +253,105 @@ class PwitchLogging:
             self.log.write("{}|{}|{}|{}".format(channel, username, datetime,
                 message))
             print("[log_chat] Something Broke...")
+
+
+
+class PwitchStats(PwitchDatabase):
+    def __init__(self,
+                 db_path,
+                 channels,
+                 api_key,
+                 update_rate=60
+                ):
+        """
+        PwitchStats
+
+        Logs stream statistics into a sqlite3 database.
+        Intended to be ran as a thread alongside Pwitch, but chan be ran
+        independantly.
+
+        Parameters:-
+        :param db_path:         Path to sqlite3 database.
+        :param channels:        List of Twitch channels to monitor.
+        :param api_key:         Pwitch api key.
+        :param update_rate:     Rate of logging (default: 60 seconds).
+        """
+
+        self.db_path = db_path
+        self.database = sqlite3.connect(db_path)
+        self.cursor = self.database.cursor()
+
+
+
+        ## API requests to Twitch kraken doesn't prefix channels with hash.
+        self.channels = [x.lstrip("#") for x in channels]
+        self.api_key = api_key
+        self.update_rate = update_rate
+
+
+    def start(self):
+        self.connected = True
+        ## Check tables constructed / channels logged in database.
+        ## self._check_database()
+        self.add_channels(self.channels)
+        channel_ids = self.pair_channelid_channelname(self.channels)
+        self.main(channel_ids)
+
+    def stop(self):
+        self.connected = False
+
+    def main(self, channel_ids):
+        """
+        main
+
+        Logs statistics of specified Twitch channels into sqlite3 database
+        table. Can be ran independantly of main Pwitch process.
+        """
+        while self.connected:
+            start_time = time.time()
+            for channel in channel_ids:
+                req="https://api.twitch.tv/kraken/streams/{}?client_id={}".format(
+                    channel[0], self.api_key)
+
+                streamer_html = requests.get(req)
+                raw_data = json.loads(streamer_html.text)
+                data = self.parse_json(raw_data)
+                if data == None:
+                    continue
+                self.log_stream_stats(data, channel[1])
+
+            iteration_time = time.time() - start_time
+            time.sleep(self.update_rate - iteration_time)
+
+    def pair_channelid_channelname(self,channels=None):
+        """
+        pair_channelid_channelname
+
+        Returns list of tuples of passed channels
+        Format - [(channel_name, channel_id)]
+        """
+        if not channels:
+            channels = self.channels
+        if type(channels) != list:
+            channels = [channels]
+
+        out_list = []
+        for i in channels:
+            out_list.append((i, self.get_channel_id(i)))
+
+        return out_list
+
+    def extend_channel_list(self, channels):
+        """
+        extend_channel_list
+
+        Extends the self.irc_rooms variable for use in te get_statistics method.
+        Allows additional channels to be added during thread runtime.
+
+        parameters:-
+        :param channels:        List of Twitch channels to add to monitor list.
+        """
+        pass
 
     def log_stream_stats(self,
                          #channel,
@@ -404,100 +394,6 @@ class PwitchLogging:
             self.database.commit()
         except:
             print("something broke")
-
-
-class PwitchStats(PwitchLogging):
-    def __init__(self,
-                 db_path,
-                 channels,
-                 api_key,
-                 update_rate=60
-                ):
-        """
-        PwitchStats
-
-        Logs stream statistics into a sqlite3 database.
-        Intended to be ran as a thread alongside Pwitch, but chan be ran
-        independantly.
-
-        Parameters:-
-        :param db_path:         Path to sqlite3 database.
-        :param channels:        List of Twitch channels to monitor.
-        :param api_key:         Pwitch api key.
-        :param update_rate:     Rate of logging (default: 60 seconds).
-        """
-
-        self.db_path = db_path
-        ## API requests to Twitch kraken doesn't prefix channels with hash.
-        self.channels = [x.lstrip("#") for x in channels]
-        self.api_key = api_key
-        self.update_rate = update_rate
-
-
-    def start(self):
-        self.connected = True
-        ## Check tables constructed / channels logged in database.
-        self._check_database()
-        self.channel_in_database(self.channels)
-
-        channel_ids = self.pair_channelid_channelname(self.channels)
-        self.main(channel_ids)
-
-    def stop(self):
-        self.connected = False
-
-    def pair_channelid_channelname(self,channels=None):
-        """
-        pair_channelid_channelname
-
-        Returns list of tuples of passed channels
-        Format - [(channel_name, channel_id)]
-        """
-        if not channels:
-            channels = self.channels
-        if type(channels) != list:
-            channels = [channels]
-
-        out_list = []
-        for i in channels:
-            out_list.append((i, self.get_channel_id(i)))
-
-        return out_list
-
-    def extend_channel_list(self, channels):
-        """
-        extend_channel_list
-
-        Extends the self.irc_rooms variable for use in te get_statistics method.
-        Allows additional channels to be added during thread runtime.
-
-        parameters:-
-        :param channels:        List of Twitch channels to add to monitor list.
-        """
-        pass
-
-    def main(self, channel_ids):
-        """
-        main
-
-        Logs statistics of specified Twitch channels into sqlite3 database
-        table. Can be ran independantly of main Pwitch process.
-        """
-        while self.connected:
-            start_time = time.time()
-            for channel in channel_ids:
-                req="https://api.twitch.tv/kraken/streams/{}?client_id={}".format(
-                    channel[0], self.api_key)
-
-                streamer_html = requests.get(req)
-                raw_data = json.loads(streamer_html.text)
-                data = self.parse_json(raw_data)
-                if data == None:
-                    continue
-                self.log_stream_stats(data, channel[1])
-
-            iteration_time = time.time() - start_time
-            time.sleep(self.update_rate - iteration_time)
 
     def parse_json(self, raw_data):
         """
