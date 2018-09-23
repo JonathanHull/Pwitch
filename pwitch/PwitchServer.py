@@ -3,7 +3,7 @@
 import time
 
 from .Pwitch import Pwitch
-from .PwitchLogging import PwitchStats
+from .PwitchLogging import PwitchDatabase, PwitchStats
 from threading import Thread
 from multiprocessing import Process, Queue
 
@@ -55,17 +55,21 @@ class PwitchServer:
 
         Initialises and starts all Pwitch processes.
         """
+        ## Initialise Pwitch Sql database.
+        database = PwitchDatabase(self.db_path, self.channels)
+
+        ## Creates dictionary of processes for each Twitch channel; and starts
+        ## them.
         self.process_dict = self._create_process_dict()
         self.start_processes(self.process_dict)
 
-        ## Watchdog thread -- Monitors process status.
+        ## Watchdog thread: Ensures successful/graceful termination of processes
         watchdog_thread = Thread(target=self.watchdog)
         watchdog_thread.start()
 
-        ## Channel statistics process -- Gathers statistics on Twitch channels.
+        # Channel statistics process -- Gathers statistics on Twitch channels.
         if self.channel_stats:
-            db_path = self.cfg["db_path"]
-            channel_stats = PwitchStats(db_path, self.channels, self.api_key)
+            channel_stats = PwitchStats(self.db_path, self.channels, self.api_key)
             channel_stats_process = Process(target=channel_stats.start)
             channel_stats_process.start()
 
