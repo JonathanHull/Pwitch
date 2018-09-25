@@ -68,7 +68,7 @@ class Pwitch(PwitchAdmin):
         self.verbose = verbose
         self.host = host
         self.port = port
-        self.sock = self.connectIRC()
+        self.socket = self.connectIRC()
         self.process_queue = process_queue
 
         ## Optional Logging / Channel administration
@@ -91,7 +91,7 @@ class Pwitch(PwitchAdmin):
         self.mod_list = self.getMods()
 
         if self.admin:
-            self.admin_object = PwitchAdmin(self.sock, self.channel,
+            self.admin_object = PwitchAdmin(self.socket, self.channel,
                 self.mod_list)
         if self.logging:
             from .PwitchLogging import PwitchLogging
@@ -131,7 +131,7 @@ class Pwitch(PwitchAdmin):
 
         return s
 
-    def updateIRC(self, sock=None):
+    def updateIRC(self, socket=None):
         """
         updateIRC
         
@@ -139,12 +139,12 @@ class Pwitch(PwitchAdmin):
         banned words / Commands).
 
         paramers:-
-        :param sock:       Socket object returned from connectIRC (i.e. connection
+        :param socket:       Socket object returned from connectIRC (i.e. connection
                            to twitch irc servers)
         """
 
-        if not sock:
-            sock=self.sock
+        if not socket:
+            socket=self.socket
 
         while self.connected:
             try:
@@ -152,18 +152,18 @@ class Pwitch(PwitchAdmin):
             except:
                 pass
 
-            ready = select.select([sock], [], [], self.updateRate)
+            ready = select.select([socket], [], [], self.updateRate)
 
             if ready[0]:
-                response = sock.recv(1024).decode("utf-8")
+                response = socket.recv(1024).decode("utf-8")
             else:
                 continue
             if response == "PING :tmi.twitch.tv\r\n":
-                sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+                socket.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
             else:
                 ## name search groups: 1: mod, 2: name, 3: chat
                 ## name searches for chat messages from users.
-                name = re.search('.*mod=(\d).*:(.*)!.*:+?(.*)', response,
+                name = re.search('.*mod=(\d).*:(.*)!.*\s:(.*)', response,
                         re.I|re.M)
                 ## notice = re.search('NOTICE.*:+?(.*)', response, re.M|re.I)
 
@@ -200,7 +200,7 @@ class Pwitch(PwitchAdmin):
                 ## Listen for user chat commands.
                 if self.admin and name:
                     if re.match("^!", name.group(3)):
-                        self.admin_object.switch(name.group(3))
+                        self.admin_object.switch(name.group(2), name.group(3))
 
     def user_chat_command(self, command):
         """
@@ -229,131 +229,3 @@ class Pwitch(PwitchAdmin):
                 db_path = db_dir+"pwitch.db"
             #self.database = PwitchLogging(db_path, self.channel.lstrip('#'))
             self.database = PwitchLogging(db_path, self.channel)
-
-    def chatCommand(self):
-        pass
-
-    def loadCommands(self):
-        """Load chat commands."""
-        pass
-
-    def loadBannedWords(self, banCfg=None):
-        """Load list of banned words for channel."""
-        pass
-    
-    def getMods(self):
-        """
-        getMods
-
-        Returns a list of moderators for the current channel.
-        """
-        sock = self.connectIRC()
-        n=None
-
-        ## Try loops stops script from breaking if server doesn't reply
-        ## immediately
-        while not n:
-            try:
-                ready = select.select([sock], [], [], self.updateRate)
-                if ready[0]:
-                    response = sock.recv(1024).decode("utf-8")
-                else:
-                    continue
-                if response == "PING :tmi.twitch.tv\r\n":
-                    sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
-                self.chat(".mods", socket=sock)
-                n = re.search(r':+\s(.*)', response, re.I|re.M)
-            except:
-                n = None
-
-        outlist = list(n.group().strip("\r: ").split(", "))
-        sock.close()
-
-        return outlist
-
-    def chat(self, message, socket=None):
-        """
-        chat
-
-        Fundamental Pwitch method.
-        Sends IRC commands to Twitch.
-
-        Parameters:-
-        :param message:    Command sent to Twitch IRC servers.
-        :param socket:     Socket connection to Twitch IRC servers.
-
-        """
-        if not socket:
-            socket = self.sock
-        print(self.channel)
-        socket.send("PRIVMSG {} :{}\r\n".format(self.channel, message).encode("utf-8"))
-
-    def whisper(self, user, message):
-        """Send a whisper to the specified user."""
-        ## Needs implementing.
-        pass
-
-    def ban(self, user):
-        """Ban the specified user from the current channel."""
-        self.chat(".ban {}".format(user))
-
-    def unban(self, user):
-        """Unban the specified user from the current channel."""
-        self.chat(".unban {}".format(user))
-
-    def timeout(self, user, secs=600):
-        """Timeout the specified user for the given number of seconds."""
-        self.chat(".timeout {} {}".format(user, secs))
-
-    def untimeout(self, user):
-        """Remove timeout for the specified user."""
-        self.chat(".untimeout {}".format(user))
-
-    def slow(self, duration=30):
-        """Limit how often users may send messages, in seconds."""
-        self.chat(".slow {}".format(duration))
-
-    def slowoff(self):
-        """Disable slowmode."""
-        self.chat(".slowoff")
-
-    def clear(self):
-        """Clear chatroom."""
-        self.chat(".clear")
-        print("Chat was cleared by a moderator")
-
-    def subscribers(self):
-        """Turn on subscribers only mode."""
-        self.chat(".subscribers")
-
-    def subscribersoff(self):
-        """Turn off subscribers only mode."""
-        self.chat(".subscribersoff")
-
-    def followerMode(self, duration):
-        """Turn on followers only mode."""
-        self.chat(".followers {}".format(duration))
-
-    def followerModeOff(self):
-        """Turn off followers only mode."""
-        self.chat(".followersoff")
-
-    def host(self, channel, *tagline):
-        """Host the specified channel."""
-        self.chat(".host {} {}".format(channel, tagline[0]))
-
-    def unhost(self):
-        """Stop hosting channels."""
-        self.chat(".unhost")
-
-    def commercial(self, *duration):
-        """Start commercials for x number of seconds"""
-        self.chat(".commercial {}".format(duration[0]))
-
-    def mod(self, user):
-        """Grant mod status to a user."""
-        self.chat(".mod {}".format(user))
-
-    def unmod(self, user):
-        """Revoke mod status from a user."""
-        self.chat(".unmod {}".format(user))
