@@ -6,17 +6,13 @@ import json
 import sys
 import os
 
-import time
-
-from pwitch import Pwitch, PwitchClient
+from pwitch import PwitchClient
 from pwitch.PwitchServer import PwitchServer
-from argparse import RawTextHelpFormatter as RTHF
 
 ## Use signal to handle kill signal passed by docker for graceful shutdown.
 
 def argument_parser(args):
-    parser = argparse.ArgumentParser(description="Pwitch IRC bot service",
-        formatter_class=RTHF)
+    parser = argparse.ArgumentParser(description="Pwitch IRC bot service")
 
     parser.add_argument("service", 
         help="start specified service.\nOptions are: server|client",
@@ -31,13 +27,9 @@ def argument_parser(args):
     return parser.parse_args(args)
 
 def main():
-    """
-    Main Function.
-    """
     ## Bot / Client settings
-
     if args.service == "server":
-        irc_channels = [x.lstrip("#") for x in cfg["channels"]]
+        irc_channels = cfg["channels"]
         global PwitchMaster
         PwitchMaster = PwitchServer(cfg, irc_channels)
         PwitchMaster.start()
@@ -47,14 +39,17 @@ def main():
         os.environ['chatBuffer'] = "yes"
         x = PwitchClient(cfg["nick"], cfg["oauth"], cfg["channel"],
             userBuffer=True)
+        x.start()
 
+    ## Signal handling for Docker.
+    signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
 
 
 def signal_handler(sig, frame):
     print("\n[SERVER] Disconnecting")
     PwitchMaster.stop_processes()
-    #sys.exit(0)
+    sys.exit(0)
 
 if __name__ == "__main__":
     cfg_dir = os.path.dirname(os.path.abspath(__file__))+"/cfg/"
