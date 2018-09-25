@@ -143,15 +143,15 @@ class PwitchDatabase:
         Paramers:-
         :parm
         """
-        #try:
-        self.cursor.execute("INSERT INTO {} (ChannelName, IsAdmin, IsLog, \
-            PwitchAdmin) VALUES (?,?,?,?)".format(channel_table), 
-            (channel_name, is_bot_admin, is_bot_logging, pwitch_admin))
-        self.database.commit()
+        try:
+            self.cursor.execute("INSERT INTO {} (ChannelName, IsAdmin, IsLog, \
+                PwitchAdmin) VALUES (?,?,?,?)".format(channel_table), 
+                (channel_name, is_bot_admin, is_bot_logging, pwitch_admin))
+            self.database.commit()
 
-        #except:
-        #    ## logging module
-        #    print("[log channel] Something broke")
+        except:
+            ## logging module
+            print("[log channel] Something broke")
 
 
     def add_channels(self, channels=None):
@@ -261,7 +261,8 @@ class PwitchStats(PwitchDatabase):
                  db_path,
                  channels,
                  api_key,
-                 update_rate=60
+                 update_rate=60,
+                 process_queue=None,
                 ):
         """
         PwitchStats
@@ -277,17 +278,17 @@ class PwitchStats(PwitchDatabase):
         :param update_rate:     Rate of logging (default: 60 seconds).
         """
 
+        ## Note: May have to multiprocess/multithread this class to enable
+        ## multiple API requests at once. Takes roughly 1s per channel :. needs
+        ## multiple threads to scale to large number of channels.
+
         self.db_path = db_path
-        self.database = sqlite3.connect(db_path)
-        self.cursor = self.database.cursor()
-
-
-
-        ## API requests to Twitch kraken doesn't prefix channels with hash.
-        self.channels = [x.lstrip("#") for x in channels]
+        self.channels = channels
         self.api_key = api_key
         self.update_rate = update_rate
 
+        self.database = sqlite3.connect(db_path)
+        self.cursor = self.database.cursor()
 
     def start(self):
         self.connected = True
@@ -309,19 +310,44 @@ class PwitchStats(PwitchDatabase):
         """
         while self.connected:
             start_time = time.time()
-            for channel in channel_ids:
-                req="https://api.twitch.tv/kraken/streams/{}?client_id={}".format(
-                    channel[0], self.api_key)
+            while (time.time()-start_time < self.update_rate):
+                try:
+                    self.connected = self.process_queue.get_nowait()
+                except:
+                    time.sleep(0.2)
+                self.log_channel_data(channel_ids)
 
-                streamer_html = requests.get(req)
+            ## While loop implemented to catch server shutdown through mp queue.
+            ## Requests channel data from twitch kraken service.
+            #for channel in channel_ids:
+            #    req="https://api.twitch.tv/kraken/streams/{}?client_id={}".format(
+            #        channel[0], self.api_key)
+            #    try:
+            #        streamer_html = requests.get(req)
+            #        raw_data = json.loads(streamer_html.text)
+            #        data = self.parse_json(raw_data)
+            #        if data == None:
+            #            continue
+            #        self.log_stream_stats(data, channel[1])
+            #    except:
+            #        pass
+
+            #iteration_time = time.time() - start_time
+            #time.sleep(self.update_rate - iteration_time)
+
+    def log_channel_data(self, channels):
+        for channel in channels:
+            req="https://api.twitch.tv/kraken/streams/{}?client_id={}".format(
+                channel[0], self.api_key)
+            try:
+                streamer_html = requests.get(req, timeout=5)
                 raw_data = json.loads(streamer_html.text)
                 data = self.parse_json(raw_data)
                 if data == None:
                     continue
                 self.log_stream_stats(data, channel[1])
-
-            iteration_time = time.time() - start_time
-            time.sleep(self.update_rate - iteration_time)
+            except:
+                pass
 
     def pair_channelid_channelname(self,channels=None):
         """
