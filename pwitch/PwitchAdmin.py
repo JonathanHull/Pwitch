@@ -25,15 +25,26 @@ class PwitchAdmin:
         """
         self.sock = sock
         self.channel = "#"+channel
-        self.mod_list = self.mod_list
+        self.mod_list = mod_list
 
-    def switch(self, command):
+    def switch(self, username, command):
+        """
+        Switch
+        Pythonised switch statement. Executes PwitchAdmin method thorugh command
+        parameter.
+
+        Paramters:-
+        :param username:        Name of user who issued the command.
+        :param command:         Command to be executed by Pwitch.
+        """
+
         command = re.match(r"^[\\.!](\w*)\s*(\w*)\s*(\w*)", command, re.I|re.M)
         c = command.group(1)
         a1 = command. group(2)
         a2 = command. group(3)
 
-        ## Strange method of doing this.
+        ## Pythonised Switch statement for admin-level bot commands.
+        ## Remove self.test.
         function = {
             'help'           : self.help,
             'mods'           : self.getMods,
@@ -56,7 +67,13 @@ class PwitchAdmin:
             'test'           : self.test,
         }.get(c, self.custom)
 
-        return function(a1, a2)
+        ## Non-mod commands.
+        if function in [self.test, self.help, self.getMods, self.custom]:
+            return function(a1,a2)
+
+        ## Mod commands
+        elif username in self.mod_list:
+            return function(a1,a2)
 
     def chat(self, message, socket=None):
         """
@@ -73,6 +90,38 @@ class PwitchAdmin:
         if not socket:
             socket = self.sock
         socket.send("PRIVMSG {} :{}\r\n".format(self.channel, message).encode("utf-8"))
+
+    def getMods(self, socket=None):
+        """
+        getMods
+
+        Returns a list of moderators for the current channel.
+        """
+        if not socket:
+            socket = self.socket
+
+        n=None
+
+        ## Try loops stops script from breaking if server doesn't reply
+        ## immediately
+        while not n:
+            try:
+                ready = select.select([sock], [], [], self.updateRate)
+                if ready[0]:
+                    response = sock.recv(1024).decode("utf-8")
+                else:
+                    continue
+                if response == "PING :tmi.twitch.tv\r\n":
+                    sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+                self.chat(".mods", socket=sock)
+                n = re.search(r':+\s(.*)', response, re.I|re.M)
+            except:
+                n = None
+
+        outlist = list(n.group().strip("\r: ").split(", "))
+        sock.close()
+
+        return outlist
 
     def test(self, *args):
         self.chat("This is a test!")
@@ -154,6 +203,7 @@ class PwitchAdmin:
         """Revoke mod status from a user."""
         self.chat(".unmod {}".format(args[0]))
         self.mod_list.remove(args[0])
+
 
 class PwitchCron:
     def __init__(self,
