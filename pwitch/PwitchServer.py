@@ -4,6 +4,8 @@ import time
 
 from .Pwitch import Pwitch
 from .PwitchLogging import PwitchDatabase, PwitchStats
+from .PwitchUtils import parent_dir
+
 from threading import Thread
 from multiprocessing import Process, Queue
 
@@ -17,7 +19,7 @@ class PwitchServer:
     def __init__(self,
                  cfg, 
                  channels,
-                 verbose = True,
+                 verbose = False,
                  channel_stats=True,
                  timeout = 10,
                  ):
@@ -46,8 +48,12 @@ class PwitchServer:
         self.connected = True     # watchdog thread flag
 
         if self.channel_stats:
-            self.db_path = cfg["db_path"]
             self.api_key = cfg["api_key"]
+
+        if cfg["db_path"] != "default":
+            self.db_path = cfg["db_path"]
+        else:
+            self.db_path = parent_dir(parent_dir(__file__))+"/log/pwitch.db"
 
     def start(self):
         """
@@ -69,9 +75,16 @@ class PwitchServer:
 
         # Channel statistics process -- Gathers statistics on Twitch channels.
         if self.channel_stats:
-            channel_stats = PwitchStats(self.db_path, self.channels, self.api_key)
-            channel_stats_process = Process(target=channel_stats.start)
-            channel_stats_process.start()
+            q = Queue()
+            channel_stats = PwitchStats(self.db_path, self.channels,
+                self.api_key, process_queue=q)
+            self.process_dict["channel_stats"] = (
+            [Process(target=channel_stats.start), q, True])
+
+            self.process_dict["channel_stats"][0].start()
+
+            #channel_stats_process = Process(target=channel_stats.start)
+            #channel_stats_process.start()
 
 
     def watchdog(self, timeout=10):
@@ -85,7 +98,9 @@ class PwitchServer:
         :param timeout:         Time for process to shutdown before termination.
         """
         ## Extensive logging required.
-        while self.connected:
+
+        while not all([x[0].is_alive is False for x in self.process_dict.values()]):
+        #while len(self.process_dict)>0:
             remove = []
             for key, values in self.process_dict.items():
                 process, queue, flag = values
@@ -95,12 +110,13 @@ class PwitchServer:
                 ## terminated.
                 if not flag: 
                     process.terminate()
-                    time.sleep(0.2)
+                    time.sleep(0.02)
                     if not process.is_alive():
-                        print(1)
                         remove.append(key)
                         process.join(timeout=1.0)
                         queue.close()
+                        if self.verbose:
+                            print("KILLED :: {}".format(key))
                         continue
 
                 if not process.is_alive():
@@ -112,6 +128,8 @@ class PwitchServer:
                 self.process_dict.pop(i)
 
             time.sleep(0.2)
+        print("[WATCHDOG] FINISHED")
+        print(self.process_dict.values())
 
 
     def _create_process_dict(self):
@@ -202,6 +220,8 @@ class PwitchServer:
                     print("[DISCONNECTED] {}".format(i))
 
             self.connected = False
+
+        #print(self.process_dict["channel_stats"])
 
         ## use watchdog to see if threads close properly
         ## Join threads
